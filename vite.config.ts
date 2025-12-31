@@ -1,5 +1,6 @@
 import path from 'path';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -107,6 +108,232 @@ const randomPassword = () => {
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Simple setup using just DB password (no CLI login needed)
+const simpleSupabaseSetupPlugin = (): Plugin => {
+  return {
+    name: 'openbento-supabase-simple-setup',
+    apply: 'serve',
+    configureServer(server) {
+      const configPath = path.join(server.config.root, '.supabase-config.json');
+
+      server.middlewares.use(async (req, res, next) => {
+        try {
+          if (!req.url) return next();
+
+          // Get saved config
+          if (req.method === 'GET' && req.url === '/__openbento/config') {
+            try {
+              const data = fs.readFileSync(configPath, 'utf8');
+              json(res, 200, { ok: true, config: JSON.parse(data) });
+            } catch {
+              json(res, 200, { ok: true, config: null });
+            }
+            return;
+          }
+
+          // Save config
+          if (req.method === 'POST' && req.url === '/__openbento/config') {
+            const body = await readJsonBody(req);
+            fs.writeFileSync(configPath, JSON.stringify(body, null, 2));
+            json(res, 200, { ok: true });
+            return;
+          }
+
+          // Fetch analytics data (dev only)
+          if (req.method === 'POST' && req.url === '/__openbento/analytics/fetch') {
+            const body = (await readJsonBody(req)) as any;
+            const projectUrl = body?.projectUrl?.trim();
+            const dbPassword = body?.dbPassword?.trim();
+            const siteId = body?.siteId?.trim();
+            const days = parseInt(body?.days) || 30;
+
+            if (!projectUrl || !dbPassword) {
+              json(res, 400, { ok: false, error: 'Missing projectUrl or dbPassword' });
+              return;
+            }
+
+            const projectRef = parseProjectRefFromSupabaseUrl(projectUrl);
+            if (!projectRef) {
+              json(res, 400, { ok: false, error: 'Invalid Supabase URL' });
+              return;
+            }
+
+            const dbHost = `db.${projectRef}.supabase.co`;
+
+            try {
+              // Fetch all analytics data
+              const query = siteId
+                ? `SELECT * FROM public.openbento_analytics_events WHERE site_id = '${siteId.replace(/'/g, "''")}' AND created_at > NOW() - INTERVAL '${days} days' ORDER BY created_at DESC LIMIT 10000`
+                : `SELECT * FROM public.openbento_analytics_events WHERE created_at > NOW() - INTERVAL '${days} days' ORDER BY created_at DESC LIMIT 10000`;
+
+              const { stdout } = await execFileAsync('psql', [
+                '-h', dbHost,
+                '-p', '5432',
+                '-U', 'postgres',
+                '-d', 'postgres',
+                '-t', '-A', '-F', '|',
+                '-c', query
+              ], {
+                env: { ...process.env, PGPASSWORD: dbPassword },
+                timeout: 30000
+              });
+
+              // Parse the pipe-delimited output
+              const lines = stdout.trim().split('\n').filter(l => l.trim());
+              const events = lines.map(line => {
+                const parts = line.split('|');
+                return {
+                  id: parts[0],
+                  created_at: parts[1],
+                  site_id: parts[2],
+                  event_type: parts[3],
+                  block_id: parts[4] || null,
+                  destination_url: parts[5] || null,
+                  page_url: parts[6] || null,
+                  referrer: parts[7] || null,
+                  utm_source: parts[8] || null,
+                  utm_medium: parts[9] || null,
+                  utm_campaign: parts[10] || null,
+                  utm_term: parts[11] || null,
+                  utm_content: parts[12] || null,
+                  user_agent: parts[13] || null,
+                  language: parts[14] || null,
+                  screen_w: parts[15] ? parseInt(parts[15]) : null,
+                  screen_h: parts[16] ? parseInt(parts[16]) : null,
+                  visitor_id: parts[17] || null,
+                  session_id: parts[18] || null,
+                  viewport_w: parts[19] ? parseInt(parts[19]) : null,
+                  viewport_h: parts[20] ? parseInt(parts[20]) : null,
+                  timezone: parts[21] || null,
+                  duration_seconds: parts[22] ? parseInt(parts[22]) : null,
+                  scroll_depth: parts[23] ? parseInt(parts[23]) : null,
+                  engaged: parts[24] === 't',
+                  block_title: parts[25] || null
+                };
+              });
+
+              json(res, 200, { ok: true, events, count: events.length });
+            } catch (e: any) {
+              json(res, 500, { ok: false, error: 'Failed to fetch analytics: ' + (e.message || 'Unknown error') });
+            }
+            return;
+          }
+
+          // Simple setup with just DB password
+          if (req.method === 'POST' && req.url === '/__openbento/supabase/simple-setup') {
+            const body = (await readJsonBody(req)) as any;
+            const projectUrl = body?.projectUrl?.trim();
+            const dbPassword = body?.dbPassword?.trim();
+            const anonKey = body?.anonKey?.trim();
+
+            if (!projectUrl || !dbPassword) {
+              json(res, 400, { ok: false, error: 'Missing projectUrl or dbPassword' });
+              return;
+            }
+
+            // Extract project ref from URL
+            const projectRef = parseProjectRefFromSupabaseUrl(projectUrl);
+            if (!projectRef) {
+              json(res, 400, { ok: false, error: 'Invalid Supabase URL' });
+              return;
+            }
+
+            const dbHost = `db.${projectRef}.supabase.co`;
+            const logs: string[] = [];
+
+            // Run SQL migration via psql
+            const migrationSql = `
+              create extension if not exists "pgcrypto";
+
+              create table if not exists public.openbento_analytics_events (
+                id uuid primary key default gen_random_uuid(),
+                created_at timestamptz not null default now(),
+                site_id text not null,
+                event_type text not null check (event_type in ('page_view', 'click')),
+                block_id text,
+                destination_url text,
+                page_url text,
+                referrer text,
+                utm_source text,
+                utm_medium text,
+                utm_campaign text,
+                utm_term text,
+                utm_content text,
+                user_agent text,
+                language text,
+                screen_w integer,
+                screen_h integer
+              );
+
+              create index if not exists openbento_analytics_events_site_time_idx
+                on public.openbento_analytics_events (site_id, created_at desc);
+
+              alter table public.openbento_analytics_events enable row level security;
+
+              DO $$ BEGIN
+                IF NOT EXISTS (
+                  SELECT 1 FROM pg_policies WHERE tablename = 'openbento_analytics_events' AND policyname = 'Allow public inserts'
+                ) THEN
+                  CREATE POLICY "Allow public inserts" ON public.openbento_analytics_events FOR INSERT WITH CHECK (true);
+                END IF;
+              END $$;
+
+              -- Note: No SELECT policy for anon users = more secure
+              -- Only service_role key can read analytics data
+            `;
+
+            try {
+              logs.push('Connecting to database...');
+              const { stdout, stderr } = await execFileAsync('psql', [
+                '-h', dbHost,
+                '-p', '5432',
+                '-U', 'postgres',
+                '-d', 'postgres',
+                '-c', migrationSql
+              ], {
+                env: { ...process.env, PGPASSWORD: dbPassword },
+                timeout: 30000
+              });
+              logs.push('Migration applied successfully!');
+              if (stdout) logs.push(stdout);
+            } catch (e: any) {
+              json(res, 500, {
+                ok: false,
+                error: 'Failed to run migration: ' + (e.message || 'Unknown error'),
+                logs,
+                stderr: e.stderr
+              });
+              return;
+            }
+
+            // Save config
+            const config = {
+              projectUrl,
+              projectRef,
+              anonKey: anonKey || null,
+              setupAt: new Date().toISOString()
+            };
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+            logs.push('Config saved to .supabase-config.json');
+
+            json(res, 200, {
+              ok: true,
+              logs,
+              config
+            });
+            return;
+          }
+
+          return next();
+        } catch (e) {
+          json(res, 500, { ok: false, error: e instanceof Error ? e.message : 'Internal error' });
+          return;
+        }
+      });
+    },
+  };
+};
 
 const openbentoSupabaseDevPlugin = (): Plugin => {
   return {
@@ -407,7 +634,7 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
       },
-      plugins: [react(), openbentoSupabaseDevPlugin()],
+      plugins: [react(), simpleSupabaseSetupPlugin(), openbentoSupabaseDevPlugin()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)

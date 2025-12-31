@@ -51,8 +51,8 @@ export interface BlockData {
   content?: string; // URL or Text
   subtext?: string;
   imageUrl?: string;
-  colSpan: number; // 1, 2, or 3
-  rowSpan: number; // 1 or 2
+  colSpan: number; // 1-9 (9-col grid)
+  rowSpan: number; // 1+ (builder clamps to 50)
   color?: string; // Tailwind class like 'bg-blue-100'
   customBackground?: string; // Raw CSS value (hex or gradient)
   textColor?: string; // 'text-black' or 'text-white'
@@ -99,6 +99,7 @@ export interface UserProfile {
   analytics?: {
     enabled?: boolean;
     supabaseUrl?: string; // https://<project-ref>.supabase.co
+    anonKey?: string; // Supabase anon/public key
   };
   // Centralized social accounts configuration
   socialAccounts?: SocialAccount[];
@@ -107,6 +108,7 @@ export interface UserProfile {
 export interface SiteData {
   profile: UserProfile;
   blocks: BlockData[];
+  gridVersion?: number;
 }
 
 export interface SavedBento {

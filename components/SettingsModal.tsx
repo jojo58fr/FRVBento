@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Plus, Settings, Trash2, Upload, X, Code, User, Share2 } from 'lucide-react';
+import { Plus, Settings, Trash2, Upload, X, Code, User, Share2, BarChart3, CheckCircle, AlertCircle, Loader2, Database } from 'lucide-react';
 import type { SocialAccount, SocialPlatform, UserProfile, BlockData } from '../types';
 import { AVATAR_PLACEHOLDER } from '../constants';
 import ImageCropModal from './ImageCropModal';
@@ -18,7 +18,7 @@ type SettingsModalProps = {
   onBlocksChange?: (blocks: BlockData[]) => void;
 };
 
-type TabType = 'general' | 'social' | 'json';
+type TabType = 'general' | 'social' | 'analytics' | 'json';
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -42,6 +42,82 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // JSON editor state
   const [jsonText, setJsonText] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
+
+  // Supabase Analytics state
+  const [supabaseProjectUrl, setSupabaseProjectUrl] = useState('');
+  const [supabaseDbPassword, setSupabaseDbPassword] = useState('');
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupResult, setSetupResult] = useState<{ ok: boolean; message: string; logs?: string[] } | null>(null);
+  const [savedConfig, setSavedConfig] = useState<{ projectUrl?: string; anonKey?: string } | null>(null);
+
+  // Load saved config on mount
+  useEffect(() => {
+    if (isOpen && activeTab === 'analytics') {
+      fetch('/__openbento/config')
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok && data.config) {
+            setSavedConfig(data.config);
+            setSupabaseProjectUrl(data.config.projectUrl || '');
+            setSupabaseAnonKey(data.config.anonKey || '');
+            // Also update profile analytics if not set
+            if (data.config.projectUrl && !profile.analytics?.supabaseUrl) {
+              setProfile({
+                ...profile,
+                analytics: {
+                  ...profile.analytics,
+                  enabled: true,
+                  supabaseUrl: data.config.projectUrl,
+                  anonKey: data.config.anonKey,
+                }
+              });
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, activeTab]);
+
+  const handleSupabaseSetup = async () => {
+    setSetupLoading(true);
+    setSetupResult(null);
+
+    try {
+      const res = await fetch('/__openbento/supabase/simple-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectUrl: supabaseProjectUrl,
+          dbPassword: supabaseDbPassword,
+          anonKey: supabaseAnonKey,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.ok) {
+        setSetupResult({ ok: true, message: 'Database setup complete!', logs: data.logs });
+        setSavedConfig(data.config);
+        setSupabaseDbPassword(''); // Clear password after success
+        // Update profile
+        setProfile({
+          ...profile,
+          analytics: {
+            enabled: true,
+            supabaseUrl: supabaseProjectUrl,
+            anonKey: supabaseAnonKey,
+          }
+        });
+      } else {
+        setSetupResult({ ok: false, message: data.error || 'Setup failed', logs: data.logs });
+      }
+    } catch (e) {
+      setSetupResult({ ok: false, message: 'Network error: ' + (e as Error).message });
+    } finally {
+      setSetupLoading(false);
+    }
+  };
 
   const socialAccounts = profile.socialAccounts || [];
 
@@ -155,6 +231,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: 'general', label: 'General', icon: <User size={16} /> },
     { id: 'social', label: 'Social', icon: <Share2 size={16} /> },
+    { id: 'analytics', label: 'Analytics', icon: <BarChart3 size={16} /> },
     { id: 'json', label: 'Raw JSON', icon: <Code size={16} /> },
   ];
 
@@ -521,6 +598,190 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
                       </div>
                     )}
+                  </div>
+                </section>
+              )}
+
+              {/* ANALYTICS TAB */}
+              {activeTab === 'analytics' && (
+                <section className="space-y-6">
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Supabase Analytics</h3>
+                    <p className="text-sm text-gray-500">
+                      Track page views and clicks on your exported bento. This requires a Supabase project.
+                    </p>
+                  </div>
+
+                  {/* Status indicator */}
+                  {savedConfig?.projectUrl && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">
+                      <CheckCircle size={20} className="text-green-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-green-800">Analytics configured</p>
+                        <p className="text-xs text-green-600">{savedConfig.projectUrl}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Setup instructions */}
+                  <div className="p-4 bg-gray-50 rounded-xl space-y-2">
+                    <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <Database size={16} />
+                      Setup Instructions
+                    </h4>
+                    <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+                      <li>Create a Supabase project at <a href="https://supabase.com" target="_blank" rel="noopener" className="text-violet-600 underline">supabase.com</a></li>
+                      <li>Copy your Project URL (e.g., https://xxx.supabase.co)</li>
+                      <li>Copy your Database Password (from project creation)</li>
+                      <li>Copy your Publishable Key (Settings → API → anon public)</li>
+                      <li>Fill the form below and click "Setup Database"</li>
+                    </ol>
+                    <p className="text-xs text-amber-600 mt-2">
+                      ⚠️ This setup only works in dev mode. Credentials are stored locally and never committed.
+                    </p>
+                  </div>
+
+                  {/* Setup form */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Supabase Project URL
+                      </label>
+                      <input
+                        type="text"
+                        value={supabaseProjectUrl}
+                        onChange={(e) => setSupabaseProjectUrl(e.target.value)}
+                        placeholder="https://xxxxx.supabase.co"
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent focus:bg-white transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Database Password
+                      </label>
+                      <input
+                        type="password"
+                        value={supabaseDbPassword}
+                        onChange={(e) => setSupabaseDbPassword(e.target.value)}
+                        placeholder="Your Supabase DB password"
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent focus:bg-white transition-all"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Used only for setup, not stored.</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        Publishable Key (anon public)
+                      </label>
+                      <input
+                        type="text"
+                        value={supabaseAnonKey}
+                        onChange={(e) => setSupabaseAnonKey(e.target.value)}
+                        placeholder="eyJhbGciOiJIUzI1NiIs..."
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent focus:bg-white transition-all font-mono text-xs"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Safe to use in client-side code. Never use the secret/service_role key here.</p>
+                    </div>
+
+                    {/* Save Config button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!supabaseProjectUrl || !supabaseAnonKey) return;
+                        fetch('/__openbento/config', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            projectUrl: supabaseProjectUrl,
+                            anonKey: supabaseAnonKey,
+                            savedAt: new Date().toISOString()
+                          }),
+                        }).then(() => {
+                          setSavedConfig({ projectUrl: supabaseProjectUrl, anonKey: supabaseAnonKey });
+                          setProfile({
+                            ...profile,
+                            analytics: {
+                              enabled: true,
+                              supabaseUrl: supabaseProjectUrl,
+                              anonKey: supabaseAnonKey,
+                            }
+                          });
+                          setSetupResult({ ok: true, message: 'Config saved!' });
+                        });
+                      }}
+                      disabled={!supabaseProjectUrl || !supabaseAnonKey}
+                      className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle size={18} />
+                      Save Config
+                    </button>
+
+                    {/* Setup Database button */}
+                    <button
+                      type="button"
+                      onClick={handleSupabaseSetup}
+                      disabled={setupLoading || !supabaseProjectUrl || !supabaseDbPassword}
+                      className="w-full py-2.5 bg-violet-100 text-violet-700 rounded-xl font-semibold hover:bg-violet-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                    >
+                      {setupLoading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Setting up...
+                        </>
+                      ) : (
+                        <>
+                          <Database size={16} />
+                          Setup Database (first time only)
+                        </>
+                      )}
+                    </button>
+                    <p className="text-xs text-gray-400 text-center">Only needed once to create the analytics table</p>
+                  </div>
+
+                  {/* Result */}
+                  {setupResult && (
+                    <div className={`p-4 rounded-xl ${setupResult.ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        {setupResult.ok ? (
+                          <CheckCircle size={18} className="text-green-600" />
+                        ) : (
+                          <AlertCircle size={18} className="text-red-600" />
+                        )}
+                        <span className={`text-sm font-medium ${setupResult.ok ? 'text-green-800' : 'text-red-800'}`}>
+                          {setupResult.message}
+                        </span>
+                      </div>
+                      {setupResult.logs && (
+                        <div className="mt-2 p-2 bg-black/5 rounded text-xs font-mono text-gray-600 max-h-32 overflow-auto">
+                          {setupResult.logs.map((log, i) => <div key={i}>{log}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Enable toggle */}
+                  <div className="pt-4 border-t border-gray-100">
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span className="text-sm font-medium text-gray-700">Enable Analytics on Export</span>
+                      <input
+                        type="checkbox"
+                        checked={profile.analytics?.enabled || false}
+                        onChange={(e) => setProfile({
+                          ...profile,
+                          analytics: {
+                            ...profile.analytics,
+                            enabled: e.target.checked,
+                            supabaseUrl: supabaseProjectUrl || profile.analytics?.supabaseUrl,
+                            anonKey: supabaseAnonKey || profile.analytics?.anonKey,
+                          }
+                        })}
+                        className="w-5 h-5 rounded text-violet-600 border-gray-300 focus:ring-violet-500"
+                      />
+                    </label>
+                    <p className="text-xs text-gray-400 mt-1">
+                      When enabled, your exported page will track views and clicks.
+                    </p>
                   </div>
                 </section>
               )}

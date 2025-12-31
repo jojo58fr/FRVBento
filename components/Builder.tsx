@@ -7,7 +7,7 @@ import SettingsModal from './SettingsModal';
 import ImageCropModal from './ImageCropModal';
 import AvatarStyleModal from './AvatarStyleModal';
 import { exportSite, type ExportDeploymentTarget } from '../services/exportService';
-import { initializeApp, updateBentoData, setActiveBentoId, getBento, downloadBentoJSON, loadBentoFromFile, renameBento } from '../services/storageService';
+import { initializeApp, updateBentoData, setActiveBentoId, getBento, downloadBentoJSON, loadBentoFromFile, renameBento, GRID_VERSION } from '../services/storageService';
 import { getSocialPlatformOption, buildSocialUrl, formatFollowerCount } from '../socialPlatforms';
 import { Download, Layout, Share2, X, Check, Plus, Eye, Smartphone, Monitor, Home, Globe, BarChart3, RefreshCw, AlertTriangle, Settings, Upload, FileDown, Camera, Pencil, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -227,6 +227,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const [activeBento, setActiveBento] = useState<SavedBento | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [blocks, setBlocks] = useState<BlockData[]>([]);
+  const [gridVersion, setGridVersion] = useState<number>(GRID_VERSION);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showDeployModal, setShowDeployModal] = useState(false);
@@ -312,14 +313,20 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     const loadBento = async () => {
       try {
         const bento = await initializeApp();
-        setActiveBento(bento);
+        const dataGridVersion = bento.data.gridVersion ?? GRID_VERSION;
+        // Migrate blocks from old 3-col grid to new 9-col grid (legacy only)
+        const migratedBlocks = dataGridVersion < GRID_VERSION
+          ? migrateBlocksToNewGrid(bento.data.blocks)
+          : bento.data.blocks;
+        const normalizedBlocks = ensureBlocksHavePositions(migratedBlocks);
+        const nextGridVersion = GRID_VERSION;
+        setActiveBento({ ...bento, data: { ...bento.data, blocks: normalizedBlocks, gridVersion: nextGridVersion } });
         setProfile(bento.data.profile);
-        // Migrate blocks from old 3-col grid to new 9-col grid
-        const migratedBlocks = migrateBlocksToNewGrid(bento.data.blocks);
-        setBlocks(migratedBlocks);
-        // Save migrated blocks if they changed
-        if (migratedBlocks !== bento.data.blocks) {
-          updateBentoData(bento.id, { profile: bento.data.profile, blocks: migratedBlocks });
+        setGridVersion(nextGridVersion);
+        setBlocks(normalizedBlocks);
+        // Save migrated/normalized blocks if they changed
+        if (normalizedBlocks !== bento.data.blocks || nextGridVersion !== bento.data.gridVersion) {
+          updateBentoData(bento.id, { profile: bento.data.profile, blocks: normalizedBlocks, gridVersion: nextGridVersion });
         }
       } catch (e) {
         console.error('Failed to load bento:', e);
@@ -339,7 +346,8 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     // Save immediately
     updateBentoData(activeBento.id, {
       profile: newProfile,
-      blocks: newBlocks
+      blocks: newBlocks,
+      gridVersion
     });
 
     // Show "saved" status briefly
@@ -347,7 +355,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 1500);
     }, 300);
-  }, [activeBento]);
+  }, [activeBento, gridVersion]);
 
   // Handle profile changes with auto-save
   const handleSetProfile = useCallback((newProfile: UserProfile | ((prev: UserProfile) => UserProfile)) => {
@@ -362,8 +370,9 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const handleSetBlocks = useCallback((newBlocks: BlockData[] | ((prev: BlockData[]) => BlockData[])) => {
     setBlocks(prev => {
       const updated = typeof newBlocks === 'function' ? newBlocks(prev) : newBlocks;
-      if (profile) autoSave(profile, updated);
-      return updated;
+      const normalized = ensureBlocksHavePositions(updated);
+      if (profile) autoSave(profile, normalized);
+      return normalized;
     });
   }, [profile, autoSave]);
 
@@ -374,15 +383,26 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const handleBentoChange = useCallback((bento: SavedBento) => {
     // Save current before switching
     if (activeBento && profile) {
-      updateBentoData(activeBento.id, { profile, blocks });
+      updateBentoData(activeBento.id, { profile, blocks, gridVersion });
     }
-    
+
+    const dataGridVersion = bento.data.gridVersion ?? GRID_VERSION;
+    const migratedBlocks = dataGridVersion < GRID_VERSION
+      ? migrateBlocksToNewGrid(bento.data.blocks)
+      : bento.data.blocks;
+    const normalizedBlocks = ensureBlocksHavePositions(migratedBlocks);
+    const nextGridVersion = GRID_VERSION;
+    setGridVersion(nextGridVersion);
     setActiveBentoId(bento.id);
-    setActiveBento(bento);
+    setActiveBento({ ...bento, data: { ...bento.data, blocks: normalizedBlocks, gridVersion: nextGridVersion } });
     setProfile(bento.data.profile);
-    setBlocks(bento.data.blocks);
+    setBlocks(normalizedBlocks);
     setEditingBlockId(null);
-  }, [activeBento, profile, blocks]);
+
+    if (normalizedBlocks !== bento.data.blocks || nextGridVersion !== bento.data.gridVersion) {
+      updateBentoData(bento.id, { profile: bento.data.profile, blocks: normalizedBlocks, gridVersion: nextGridVersion });
+    }
+  }, [activeBento, profile, blocks, gridVersion]);
 
   const addBlock = (type: BlockType) => {
     // Check for pending position from grid cell click
@@ -481,7 +501,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     // Update bento with current state before exporting
     const currentBento = {
       ...activeBento,
-      data: { profile, blocks }
+      data: { profile, blocks, gridVersion }
     };
     downloadBentoJSON(currentBento);
   };
@@ -493,11 +513,18 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
 
     try {
       const bento = await loadBentoFromFile(file);
-      setActiveBento(bento);
+      const dataGridVersion = bento.data.gridVersion ?? GRID_VERSION;
+      const migratedBlocks = dataGridVersion < GRID_VERSION
+        ? migrateBlocksToNewGrid(bento.data.blocks)
+        : bento.data.blocks;
+      const normalizedBlocks = ensureBlocksHavePositions(migratedBlocks);
+      const nextGridVersion = GRID_VERSION;
+      setGridVersion(nextGridVersion);
+      setActiveBento({ ...bento, data: { ...bento.data, blocks: normalizedBlocks, gridVersion: nextGridVersion } });
       setProfile(bento.data.profile);
-      const migratedBlocks = migrateBlocksToNewGrid(bento.data.blocks);
-      setBlocks(migratedBlocks);
+      setBlocks(normalizedBlocks);
       setEditingBlockId(null);
+      updateBentoData(bento.id, { profile: bento.data.profile, blocks: normalizedBlocks, gridVersion: nextGridVersion });
     } catch (err) {
       console.error('Failed to import bento:', err);
       alert('Failed to import bento. Please check the JSON file.');
@@ -578,13 +605,13 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   // Save inline edits
   const saveNameEdit = () => {
     if (tempName.trim()) {
-      setProfile(prev => ({ ...prev, name: tempName.trim() }));
+      handleSetProfile(prev => ({ ...prev, name: tempName.trim() }));
     }
     setEditingField(null);
   };
 
   const saveBioEdit = () => {
-    setProfile(prev => ({ ...prev, bio: tempBio }));
+    handleSetProfile(prev => ({ ...prev, bio: tempBio }));
     setEditingField(null);
   };
 
@@ -844,43 +871,6 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     const sourceBlock = blocks[sourceIndex];
     const targetBlock = blocks[targetIndex];
 
-    // Helper to check if two blocks overlap
-    const blocksOverlap = (a: BlockData, b: BlockData) => {
-      if (a.gridColumn === undefined || a.gridRow === undefined || 
-          b.gridColumn === undefined || b.gridRow === undefined) return false;
-      
-      const aRight = a.gridColumn + Math.min(a.colSpan, GRID_COLS);
-      const aBottom = a.gridRow + a.rowSpan;
-      const bRight = b.gridColumn + Math.min(b.colSpan, GRID_COLS);
-      const bBottom = b.gridRow + b.rowSpan;
-      
-      return !(aRight <= b.gridColumn || a.gridColumn >= bRight || 
-               aBottom <= b.gridRow || a.gridRow >= bBottom);
-    };
-    
-    // Helper to find next available position for a block
-    const findNextAvailablePosition = (block: BlockData, occupiedCells: Set<string>, excludeId?: string): { col: number, row: number } => {
-      const neededCols = Math.min(block.colSpan, GRID_COLS);
-      
-      for (let row = 1; row <= 20; row++) {
-        for (let col = 1; col <= GRID_COLS - neededCols + 1; col++) {
-          let canPlace = true;
-          
-          for (let c = col; c < col + neededCols && canPlace; c++) {
-            for (let r = row; r < row + block.rowSpan && canPlace; r++) {
-              if (occupiedCells.has(`${c}-${r}`)) {
-                canPlace = false;
-              }
-            }
-          }
-          
-          if (canPlace) {
-            return { col, row };
-          }
-        }
-      }
-      return { col: 1, row: 1 };
-    };
     
     // Move source block to target's position
     let newBlocks = blocks.map(b => {
@@ -897,23 +887,6 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     // Find all blocks that now conflict with the moved source block
     const movedSource = newBlocks.find(b => b.id === sourceBlock.id)!;
     
-    // Build occupied cells set (excluding conflicting blocks initially)
-    const getOccupiedCells = (blocksToCheck: BlockData[], excludeIds: string[] = []) => {
-      const cells = new Set<string>();
-      blocksToCheck.forEach(block => {
-        if (excludeIds.includes(block.id)) return;
-        if (block.gridColumn === undefined || block.gridRow === undefined) return;
-        
-        const cols = Math.min(block.colSpan, GRID_COLS);
-        for (let c = block.gridColumn; c < block.gridColumn + cols; c++) {
-          for (let r = block.gridRow; r < block.gridRow + block.rowSpan; r++) {
-            cells.add(`${c}-${r}`);
-          }
-        }
-      });
-      return cells;
-    };
-    
     // Find conflicting blocks and relocate them
     const conflictingBlocks = newBlocks.filter(b => 
       b.id !== movedSource.id && blocksOverlap(movedSource, b)
@@ -923,7 +896,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       // Relocate each conflicting block one by one
       conflictingBlocks.forEach(conflictBlock => {
         const occupiedCells = getOccupiedCells(newBlocks, [conflictBlock.id]);
-        const newPos = findNextAvailablePosition(conflictBlock, occupiedCells, conflictBlock.id);
+        const newPos = findNextAvailablePosition(conflictBlock, occupiedCells);
         
         newBlocks = newBlocks.map(b => {
           if (b.id === conflictBlock.id) {
@@ -1140,18 +1113,14 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
 	                 )}
 
 	                 {(import.meta.env.DEV || profile?.analytics?.enabled) && (
-	                   <button
-                     onClick={() => {
-                       setShowAnalyticsModal(true);
-                       // Auto-refresh when opening if we already have a token
-                       if (analyticsAdminToken.trim()) fetchAnalytics();
-                     }}
+	                   <a
+                     href="/analytics"
 	                     className="bg-white px-3.5 py-2 rounded-lg shadow-sm border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
 	                     title="View analytics dashboard"
 	                   >
 	                     <BarChart3 size={16} />
 	                     <span className="hidden sm:inline">Analytics</span>
-	                   </button>
+	                   </a>
 	                 )}
                  
                  {/* JSON Import/Export */}
@@ -1410,6 +1379,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                                         onDragEnter={() => {}}
                                                         onDragEnd={() => {}}
                                                         onDrop={() => {}}
+                                                        enableTiltEffect={true}
                                                     />
                                                   </div>
                                                 );

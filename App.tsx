@@ -1,6 +1,7 @@
 import React, { useState, Suspense } from 'react';
 import Builder from './components/Builder';
 import PreviewPage from './components/PreviewPage';
+import AnalyticsPage from './components/AnalyticsPage';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const ENABLE_LANDING = import.meta.env.VITE_ENABLE_LANDING === 'true';
@@ -17,6 +18,10 @@ function App() {
 
   if (route === '/preview') {
     return <PreviewPage />;
+  }
+
+  if (route === '/analytics') {
+    return <AnalyticsPage />;
   }
 
   const [page, setPage] = useState<'landing' | 'builder'>(ENABLE_LANDING ? 'landing' : 'builder');

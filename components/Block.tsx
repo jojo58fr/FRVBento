@@ -1,8 +1,62 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { BlockData, BlockType } from '../types';
-import { ArrowUpRight, MapPin, Type, Image as ImageIcon, Link as LinkIcon, Twitter, Github, Linkedin, Youtube, Instagram, GripHorizontal, MoveVertical, Play, Loader2, ExternalLink, Pencil } from 'lucide-react';
+import { MapPin, Type, Image as ImageIcon, Link as LinkIcon, Twitter, Github, Linkedin, Youtube, Instagram, GripHorizontal, MoveVertical, Play, Loader2, ExternalLink, Pencil } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getSocialPlatformOption, inferSocialPlatformFromUrl } from '../socialPlatforms';
+
+// Apple TV style 3D tilt effect hook
+const useTiltEffect = (isEnabled: boolean = true) => {
+  const [tiltStyle, setTiltStyle] = useState<React.CSSProperties>({});
+  const elementRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isEnabled || !elementRef.current) return;
+
+    const rect = elementRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    // Calculate rotation (max 10 degrees for subtle Apple TV effect)
+    const rotateX = ((y - centerY) / centerY) * -10;
+    const rotateY = ((x - centerX) / centerX) * 10;
+
+    // Calculate glare position
+    const glareX = (x / rect.width) * 100;
+    const glareY = (y / rect.height) * 100;
+
+    // Dynamic shadow based on tilt direction
+    const shadowX = rotateY * 1.5;
+    const shadowY = rotateX * -1.5;
+
+    setTiltStyle({
+      transform: `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`,
+      boxShadow: `${shadowX}px ${shadowY}px 25px rgba(0,0,0,0.15), 0 8px 30px rgba(0,0,0,0.1)`,
+      transition: 'transform 0.1s ease-out, box-shadow 0.1s ease-out',
+      '--glare-x': `${glareX}%`,
+      '--glare-y': `${glareY}%`,
+    } as React.CSSProperties);
+  }, [isEnabled]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (!isEnabled) return;
+    setTiltStyle({
+      transform: 'perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+      transition: 'transform 0.5s ease-out, box-shadow 0.5s ease-out',
+    });
+  }, [isEnabled]);
+
+  const handleMouseEnter = useCallback(() => {
+    if (!isEnabled) return;
+    setTiltStyle({
+      transition: 'transform 0.1s ease-out',
+    });
+  }, [isEnabled]);
+
+  return { elementRef, tiltStyle, handleMouseMove, handleMouseLeave, handleMouseEnter };
+};
 
 interface BlockProps {
   block: BlockData;
@@ -19,6 +73,7 @@ interface BlockProps {
   isResizing?: boolean;
   onResizeStart?: (block: BlockData, e: React.PointerEvent<HTMLButtonElement>) => void;
   onInlineUpdate?: (block: BlockData) => void;
+  enableTiltEffect?: boolean; // Apple TV style 3D tilt on hover
 }
 
 const Block: React.FC<BlockProps> = ({
@@ -36,7 +91,10 @@ const Block: React.FC<BlockProps> = ({
   isResizing,
   onResizeStart,
   onInlineUpdate,
+  enableTiltEffect,
 }) => {
+  // Apple TV tilt effect
+  const { elementRef: tiltRef, tiltStyle, handleMouseMove: onTiltMove, handleMouseLeave: onTiltLeave, handleMouseEnter: onTiltEnter } = useTiltEffect(enableTiltEffect);
   const [fetchedVideos, setFetchedVideos] = useState<Array<{ id: string; title: string; thumbnail: string }>>(block.youtubeVideos || []);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -181,6 +239,61 @@ const Block: React.FC<BlockProps> = ({
     return '0.875rem'; // 14px for large blocks
   };
   const borderRadius = getBorderRadius();
+  const sizeTier = (() => {
+    const minDim = Math.min(block.colSpan, block.rowSpan);
+    const area = block.colSpan * block.rowSpan;
+    if (minDim <= 1 || area <= 4) return 'xs';
+    if (minDim <= 2 || area <= 8) return 'sm';
+    if (minDim <= 3 || area <= 12) return 'md';
+    return 'lg';
+  })();
+  // Responsive text sizes: mobile first, then md: and lg: breakpoints
+  const textScale = {
+    titleText: {
+      xs: 'text-sm md:text-base',
+      sm: 'text-base md:text-lg',
+      md: 'text-lg md:text-xl lg:text-2xl',
+      lg: 'text-xl md:text-2xl lg:text-3xl',
+    },
+    titleDefault: {
+      xs: 'text-xs md:text-sm',
+      sm: 'text-sm md:text-base',
+      md: 'text-base md:text-lg',
+      lg: 'text-lg md:text-xl',
+    },
+    subtext: {
+      xs: 'text-[8px] md:text-[10px]',
+      sm: 'text-[10px] md:text-xs',
+      md: 'text-xs md:text-sm',
+      lg: 'text-sm md:text-base',
+    },
+    body: {
+      xs: 'text-[10px] md:text-xs',
+      sm: 'text-xs md:text-sm',
+      md: 'text-sm md:text-base',
+      lg: 'text-base md:text-lg',
+    },
+    overlayTitle: {
+      xs: 'text-[10px] md:text-xs',
+      sm: 'text-xs md:text-sm',
+      md: 'text-sm md:text-base lg:text-lg',
+      lg: 'text-base md:text-lg lg:text-xl',
+    },
+    overlaySubtext: {
+      xs: 'text-[8px] md:text-[10px]',
+      sm: 'text-[10px] md:text-xs',
+      md: 'text-xs md:text-sm',
+      lg: 'text-sm md:text-base',
+    },
+  };
+  const textSizes = {
+    titleText: textScale.titleText[sizeTier],
+    titleDefault: textScale.titleDefault[sizeTier],
+    subtext: textScale.subtext[sizeTier],
+    body: textScale.body[sizeTier],
+    overlayTitle: textScale.overlayTitle[sizeTier],
+    overlaySubtext: textScale.overlaySubtext[sizeTier],
+  };
 
   const resizeHandle =
     enableResize && onResizeStart ? (
@@ -317,7 +430,7 @@ const Block: React.FC<BlockProps> = ({
         }}
         data-block-id={block.id}
         className={`
-          relative cursor-pointer overflow-hidden
+          bento-item relative cursor-pointer overflow-hidden
           ${block.color || 'bg-white'}
           ${isSelected ? 'ring-2 ring-violet-500 shadow-lg' : 'hover:ring-2 hover:ring-gray-300 hover:shadow-md'}
           ${isDragTarget ? 'ring-2 ring-violet-500 bg-violet-50/50 scale-105' : ''}
@@ -427,7 +540,7 @@ const Block: React.FC<BlockProps> = ({
         animate={{ opacity: 1, scale: 1 }}
         whileHover={{ y: -4, transition: { duration: 0.2 } }}
         style={{ ...gridPositionStyle, borderRadius }}
-        className={`group relative overflow-hidden bg-white ${colClass} ${rowClass} cursor-pointer
+        className={`bento-item group relative overflow-hidden bg-white ${colClass} ${rowClass} cursor-pointer
           ${isSelected ? 'ring-4 ring-blue-500 shadow-xl z-20' : 'ring-1 ring-black/5'}
           ${!isSelected ? 'shadow-sm hover:shadow-xl' : ''}
           ${isDragTarget ? 'ring-2 ring-violet-500 z-20 scale-[1.02]' : ''}
@@ -518,8 +631,17 @@ const Block: React.FC<BlockProps> = ({
   }
 
   // ===== STANDARD BLOCKS =====
+
+  // Tilt wrapper for Apple TV effect
+  const tiltWrapperStyle: React.CSSProperties = enableTiltEffect ? {
+    ...tiltStyle,
+    width: '100%',
+    height: '100%',
+    transformStyle: 'preserve-3d',
+  } : {};
+
   return (
-    <motion.div 
+    <motion.div
       layoutId={block.id}
       layout
       draggable={!isResizing}
@@ -542,19 +664,39 @@ const Block: React.FC<BlockProps> = ({
       data-block-id={block.id}
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      style={{ ...finalStyle, ...gridPositionStyle, borderRadius }}
-      className={`group relative overflow-hidden ${!block.customBackground && !isLinkWithImage && !isRichYoutube ? (block.color || 'bg-white') : ''} ${block.textColor || 'text-gray-900'} ${colClass} ${rowClass} cursor-pointer
-        ${isSelected ? 'ring-4 ring-blue-500 shadow-xl z-20' : 'ring-1 ring-black/5'}
-        ${!isSelected ? 'shadow-sm hover:shadow-xl' : ''}
-        ${isDragTarget ? 'ring-2 ring-violet-500 z-20 scale-[1.02]' : ''}
+      whileHover={enableTiltEffect ? undefined : { y: -4, transition: { duration: 0.2 } }}
+      style={{ ...gridPositionStyle }}
+      className={`${colClass} ${rowClass} cursor-pointer select-none
+        ${isDragTarget ? 'z-20 scale-[1.02]' : ''}
         ${isDragging ? 'opacity-40 scale-95' : ''}
-        transition-all duration-300 select-none
+        ${enableTiltEffect ? 'transform-gpu' : ''}
       `}
     >
+      <div
+        ref={enableTiltEffect ? tiltRef : undefined}
+        onMouseMove={enableTiltEffect ? onTiltMove : undefined}
+        onMouseLeave={enableTiltEffect ? onTiltLeave : undefined}
+        onMouseEnter={enableTiltEffect ? onTiltEnter : undefined}
+        style={{ ...finalStyle, borderRadius, ...tiltWrapperStyle }}
+        className={`bento-item group relative overflow-hidden w-full h-full ${!block.customBackground && !isLinkWithImage && !isRichYoutube ? (block.color || 'bg-white') : ''} ${block.textColor || 'text-gray-900'}
+          ${isSelected ? 'ring-4 ring-blue-500 shadow-xl' : 'ring-1 ring-black/5'}
+          ${!isSelected && !enableTiltEffect ? 'shadow-sm hover:shadow-xl' : 'shadow-sm'}
+          ${isDragTarget ? 'ring-2 ring-violet-500' : ''}
+          transition-all duration-300
+        `}
+      >
       {/* Drop indicator */}
       {isDragTarget && (
         <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-1.5 h-16 bg-violet-500 rounded-full shadow-md shadow-violet-500/30 animate-pulse z-30" />
+      )}
+      {/* Glare effect for Apple TV tilt */}
+      {enableTiltEffect && (
+        <div
+          className="absolute inset-0 pointer-events-none z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          style={{
+            background: `radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255,255,255,0.25) 0%, transparent 60%)`,
+          }}
+        />
       )}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-current/30 z-20 pointer-events-none">
           <GripHorizontal size={20} />
@@ -575,7 +717,7 @@ const Block: React.FC<BlockProps> = ({
               {/\.(mp4|webm|ogg|mov)$/i.test(block.imageUrl) ? (
                 <video
                   src={block.imageUrl}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  className="full-img"
                   autoPlay
                   loop
                   muted
@@ -585,18 +727,15 @@ const Block: React.FC<BlockProps> = ({
                 <img
                   src={block.imageUrl}
                   alt={block.title || ''}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  className="full-img"
                 />
               )}
               {/* Subtle gradient from bottom for optional text */}
               {block.title && (
-                <>
-                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <p className="text-white font-semibold text-sm drop-shadow-lg">{block.title}</p>
-                    {block.subtext && <p className="text-white/80 text-xs mt-0.5">{block.subtext}</p>}
-                  </div>
-                </>
+                <div className="media-overlay">
+                  <p className={`media-title ${textSizes.overlayTitle}`}>{block.title}</p>
+                  {block.subtext && <p className={`media-subtext ${textSizes.overlaySubtext}`}>{block.subtext}</p>}
+                </div>
               )}
           </div>
         ) : block.type === BlockType.MAP ? (
@@ -610,7 +749,7 @@ const Block: React.FC<BlockProps> = ({
                   loading="lazy"
               ></iframe>
               <div className="absolute bottom-0 left-0 right-0 p-6 bg-black/60 text-white">
-                  <p className="font-bold text-lg flex items-center gap-2"><MapPin size={18}/> {block.title}</p>
+                  <p className={`font-bold flex items-center gap-2 ${textSizes.overlayTitle}`}><MapPin size={18}/> {block.title}</p>
               </div>
           </div>
         ) : isRichYoutube ? (
@@ -633,31 +772,24 @@ const Block: React.FC<BlockProps> = ({
             {/* Bottom: Info */}
             <div className="mt-auto">
               <div className="-mx-6 -mb-6 p-5">
-                <h3 className="font-bold text-white text-lg leading-tight drop-shadow-lg">{block.channelTitle || block.title}</h3>
-                {block.subtext && <p className="text-white/80 text-sm mt-1 font-medium drop-shadow">{block.subtext}</p>}
+                <h3 className={`font-bold text-white leading-tight drop-shadow-lg ${textSizes.overlayTitle}`}>{block.channelTitle || block.title}</h3>
+                {block.subtext && <p className={`text-white/80 mt-1 font-medium drop-shadow ${textSizes.overlaySubtext}`}>{block.subtext}</p>}
               </div>
             </div>
           </div>
         ) : (
           /* DEFAULT BLOCK (Link, Social, Text) */
-          <div className="p-6 h-full flex flex-col justify-between relative">
+          <div className="p-3 md:p-4 lg:p-6 h-full flex flex-col justify-between relative">
             <div className="flex justify-between items-start">
                {/* Only show icon for SOCIAL blocks, not LINK or TEXT */}
                {block.type === BlockType.SOCIAL && (
-                 <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-sm ${
+                 <div className={`w-8 h-8 md:w-10 md:h-10 lg:w-11 lg:h-11 rounded-xl md:rounded-2xl flex items-center justify-center shadow-sm ${
                    block.textColor === 'text-white' || isLinkWithImage
                      ? 'bg-white/20 text-white backdrop-blur-md'
                      : 'bg-white/90 shadow-md'
                  }`}>
                    {getIcon()}
                  </div>
-               )}
-               {(block.type === BlockType.LINK || block.type === BlockType.SOCIAL) && (
-                   <div className={`opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:translate-x-1 group-hover:-translate-y-1 ${
-                     block.textColor === 'text-white' || isLinkWithImage ? 'text-white' : 'text-gray-400'
-                   }`}>
-                     <ArrowUpRight size={24} />
-                   </div>
                )}
             </div>
 
@@ -673,12 +805,12 @@ const Block: React.FC<BlockProps> = ({
                     onBlur={handleTitleSave}
                     onKeyDown={handleTitleKeyDown}
                     onClick={(e) => e.stopPropagation()}
-                    className={`font-bold leading-tight tracking-tight bg-transparent border-b-2 border-violet-500 outline-none w-full pointer-events-auto ${block.type === BlockType.TEXT ? 'text-2xl mb-2' : 'text-lg'} ${isLinkWithImage ? 'text-white' : ''}`}
+                    className={`font-bold leading-tight tracking-tight bg-transparent border-b-2 border-violet-500 outline-none w-full pointer-events-auto ${block.type === BlockType.TEXT ? `${textSizes.titleText} mb-2` : textSizes.titleDefault} ${isLinkWithImage ? 'text-white' : ''}`}
                     placeholder="Title..."
                   />
                 ) : (
                   <h3
-                    className={`font-bold leading-tight tracking-tight cursor-text ${block.type === BlockType.TEXT ? 'text-2xl mb-2' : 'text-lg'} ${isLinkWithImage ? 'text-white drop-shadow-lg' : ''}`}
+                    className={`font-bold leading-tight tracking-tight cursor-text ${block.type === BlockType.TEXT ? `${textSizes.titleText} mb-2` : textSizes.titleDefault} ${isLinkWithImage ? 'text-white drop-shadow-lg' : ''}`}
                     onClick={(e) => {
                       if (onInlineUpdate) {
                         e.stopPropagation();
@@ -705,13 +837,13 @@ const Block: React.FC<BlockProps> = ({
                     onBlur={handleSubtextSave}
                     onKeyDown={handleSubtextKeyDown}
                     onClick={(e) => e.stopPropagation()}
-                    className={`text-sm font-medium bg-transparent border-b-2 border-violet-500 outline-none w-full pointer-events-auto mt-1 ${isLinkWithImage ? 'text-white/70' : 'opacity-60'}`}
+                    className={`${textSizes.subtext} font-medium bg-transparent border-b-2 border-violet-500 outline-none w-full pointer-events-auto mt-1 ${isLinkWithImage ? 'text-white/70' : 'opacity-60'}`}
                     placeholder="Subtitle..."
                   />
                 ) : (
                   (block.subtext || onInlineUpdate) && (
                     <p
-                      className={`text-sm mt-1 font-medium cursor-text ${isLinkWithImage ? 'text-white/80 drop-shadow' : 'opacity-60'}`}
+                      className={`${textSizes.subtext} mt-1 font-medium cursor-text ${isLinkWithImage ? 'text-white/80 drop-shadow' : 'opacity-60'}`}
                       onClick={(e) => {
                         if (onInlineUpdate) {
                           e.stopPropagation();
@@ -729,11 +861,12 @@ const Block: React.FC<BlockProps> = ({
               </div>
 
               {block.type === BlockType.TEXT && block.content && (
-                  <p className="opacity-70 mt-2 whitespace-pre-wrap leading-relaxed">{block.content}</p>
+                  <p className={`opacity-70 mt-2 whitespace-pre-wrap leading-relaxed ${textSizes.body}`}>{block.content}</p>
               )}
             </div>
           </div>
         )}
+      </div>
       </div>
     </motion.div>
   );

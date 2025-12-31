@@ -1,7 +1,9 @@
 import JSZip from 'jszip';
 import saveAs from 'file-saver';
-import { SiteData, BlockData, BlockType } from '../types';
+import { SiteData, BlockData, BlockType, SocialPlatform } from '../types';
 import { GITHUB_WORKFLOW_YAML, BASE_COLORS } from '../constants';
+import { COMMON_BLOCK_CSS } from './commonStyles';
+import { buildSocialUrl, formatFollowerCount, getSocialPlatformOption } from '../socialPlatforms';
 
 // --- HELPERS ---
 
@@ -34,9 +36,55 @@ function getStyleFromClass(className: string | undefined, type: 'bg' | 'text'): 
     return type === 'bg' ? '#ffffff' : '#000000';
 }
 
+const SIMPLE_ICON_SLUGS: Partial<Record<SocialPlatform, string>> = {
+  x: 'x',
+  instagram: 'instagram',
+  tiktok: 'tiktok',
+  youtube: 'youtube',
+  github: 'github',
+  gitlab: 'gitlab',
+  linkedin: 'linkedin',
+  facebook: 'facebook',
+  twitch: 'twitch',
+  dribbble: 'dribbble',
+  medium: 'medium',
+  devto: 'devdotto',
+  reddit: 'reddit',
+  pinterest: 'pinterest',
+  threads: 'threads',
+  bluesky: 'bluesky',
+  mastodon: 'mastodon',
+  substack: 'substack',
+  patreon: 'patreon',
+  kofi: 'kofi',
+  buymeacoffee: 'buymeacoffee',
+  snapchat: 'snapchat',
+  discord: 'discord',
+  telegram: 'telegram',
+  whatsapp: 'whatsapp',
+};
+
+const getSimpleIconSrc = (platform: SocialPlatform | undefined, color?: string) => {
+  if (!platform) return '';
+  const slug = SIMPLE_ICON_SLUGS[platform];
+  if (!slug) return '';
+  const sanitized = color ? color.replace('#', '').trim() : '';
+  return sanitized ? `https://cdn.simpleicons.org/${slug}/${sanitized}` : `https://cdn.simpleicons.org/${slug}`;
+};
+
+const resolveIconColor = (textColor?: string, brandColor?: string) => {
+  if (!textColor || textColor === 'text-brand') return brandColor;
+  if (textColor === 'text-black') return '#000000';
+  if (textColor === 'text-white') return '#ffffff';
+  if (textColor === 'text-gray-700') return '#374151';
+  if (textColor === 'text-gray-900') return '#111827';
+  return brandColor;
+};
+
 // --- CONTENT GENERATORS ---
 
 const generateCSS = (profileName: string) => `
+${COMMON_BLOCK_CSS}
 :root {
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
   --bg-color: #f8fafc;
@@ -74,7 +122,7 @@ body {
 
 /* Left Profile */
 .profile-section {
-  padding: 4rem 2rem;
+  padding: 2rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -83,16 +131,28 @@ body {
   z-index: 20;
 }
 
+@media (min-width: 640px) {
+  .profile-section { padding: 3rem 1.5rem; }
+}
+
+@media (min-width: 1024px) {
+  .profile-section { padding: 4rem 2rem; }
+}
+
 .avatar {
-  width: 9rem;
-  height: 9rem;
-  border-radius: 1.5rem;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 1rem;
   overflow: hidden;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
-  border: 4px solid white;
+  border: 3px solid white;
   background: #f3f4f6;
   transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@media (min-width: 640px) {
+  .avatar { width: 7rem; height: 7rem; border-radius: 1.25rem; margin-bottom: 1.25rem; }
 }
 
 .avatar:hover {
@@ -112,21 +172,91 @@ body {
 }
 
 .profile-name {
-  font-size: 2.5rem;
+  font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: -0.04em;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
   line-height: 1;
   color: var(--text-main);
 }
 
 .profile-bio {
-  font-size: 1rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
   white-space: pre-wrap;
   max-width: 20rem;
-  line-height: 1.7;
+  line-height: 1.5;
   font-weight: 500;
+}
+
+@media (min-width: 640px) {
+  .profile-name { font-size: 2rem; margin-bottom: 0.6rem; }
+  .profile-bio { font-size: 0.9rem; line-height: 1.6; }
+}
+
+@media (min-width: 1024px) {
+  .profile-name { font-size: 2.5rem; margin-bottom: 0.75rem; }
+  .profile-bio { font-size: 1rem; line-height: 1.7; }
+}
+
+.profile-socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  justify-content: center;
+}
+
+.profile-social {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  background: #ffffff;
+  text-decoration: none;
+  color: var(--text-main);
+  font-weight: 600;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.profile-social.icon-only {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  justify-content: center;
+}
+
+.profile-social:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.12);
+}
+
+.profile-social .social-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.profile-social .social-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.profile-social .social-fallback {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.profile-social .social-count {
+  font-size: 0.85rem;
+  color: var(--text-main);
 }
 
 /* Right Grid */
@@ -139,7 +269,7 @@ body {
   display: grid;
   grid-template-columns: 1fr; /* Mobile default */
   gap: var(--gap);
-  grid-auto-rows: 180px;
+  grid-auto-rows: 64px;
   grid-auto-flow: dense;
   padding-bottom: 2rem;
 }
@@ -173,14 +303,30 @@ body {
 .bento-item:nth-child(7) { animation-delay: 0.4s; }
 .bento-item:nth-child(8) { animation-delay: 0.45s; }
 
-.bento-item:hover {
-  transform: translateY(-6px) scale(1.01);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  z-index: 10;
+/* Apple TV 3D tilt effect */
+.bento-item {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.bento-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255,255,255,0.25) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.bento-item:hover::before {
+  opacity: 1;
 }
 
 .bento-item:active {
-  transform: scale(0.98);
+  transform: perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(0.95, 0.95, 0.95) !important;
 }
 
 .bento-item.no-hover:hover {
@@ -189,9 +335,36 @@ body {
   cursor: default;
 }
 
+.social-icon-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.social-icon-block .social-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.social-icon-block .social-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.social-icon-block .social-fallback {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: currentColor;
+}
+
 /* Inner Content Layouts */
 .content-wrapper {
-  padding: 1.75rem;
+  padding: 0.75rem;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -200,10 +373,22 @@ body {
   z-index: 10;
 }
 
+@media (min-width: 640px) {
+  .content-wrapper { padding: 1rem; }
+}
+
+@media (min-width: 1024px) {
+  .content-wrapper { padding: 1.75rem; }
+}
+
+.content-wrapper.link-only {
+  justify-content: flex-end;
+}
+
 .icon-box {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 1rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
   background: rgba(255, 255, 255, 0.9);
   display: flex;
   align-items: center;
@@ -211,33 +396,103 @@ body {
   box-shadow: 0 4px 6px rgba(0,0,0,0.05);
 }
 
+.icon-box img {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+}
+
+.icon-box .icon-fallback {
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+@media (min-width: 640px) {
+  .icon-box { width: 2.5rem; height: 2.5rem; border-radius: 0.75rem; }
+  .icon-box img { width: 1.2rem; height: 1.2rem; }
+  .icon-box .icon-fallback { font-size: 0.75rem; }
+}
+
+@media (min-width: 1024px) {
+  .icon-box { width: 3rem; height: 3rem; border-radius: 1rem; }
+  .icon-box img { width: 1.4rem; height: 1.4rem; }
+  .icon-box .icon-fallback { font-size: 0.85rem; }
+}
+
 .block-title {
   font-weight: 800;
-  font-size: 1.25rem;
+  font-size: 0.85rem;
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
 
 .block-sub {
   opacity: 0.8;
-  font-size: 0.9rem;
-  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  margin-top: 0.25rem;
   font-weight: 500;
+}
+
+@media (min-width: 640px) {
+  .block-title { font-size: 1rem; }
+  .block-sub { font-size: 0.8rem; margin-top: 0.3rem; }
+}
+
+@media (min-width: 1024px) {
+  .block-title { font-size: 1.25rem; }
+  .block-sub { font-size: 0.9rem; margin-top: 0.35rem; }
 }
 
 /* Specific Types */
 .type-text { justify-content: center; }
-.type-text h3 { font-size: 1.75rem; margin-bottom: 0.5rem; letter-spacing: -0.03em; }
+.type-text .block-title { font-size: 1rem; margin-bottom: 0.35rem; letter-spacing: -0.03em; }
+.type-text .block-body { opacity: 0.8; line-height: 1.5; font-size: 0.75rem; }
+
+@media (min-width: 640px) {
+  .type-text .block-title { font-size: 1.35rem; margin-bottom: 0.4rem; }
+  .type-text .block-body { font-size: 0.9rem; }
+}
+
+@media (min-width: 1024px) {
+  .type-text .block-title { font-size: 1.75rem; margin-bottom: 0.5rem; }
+  .type-text .block-body { font-size: 1.1rem; line-height: 1.6; }
+}
+
+/* Smaller blocks: reduce text sizes */
+.bento-item.size-xs .block-title { font-size: 0.7rem; }
+.bento-item.size-xs .block-sub { font-size: 0.55rem; }
+.bento-item.size-xs .block-body { font-size: 0.65rem; }
+.bento-item.size-xs .type-text .block-title { font-size: 0.8rem; }
+
+.bento-item.size-sm .block-title { font-size: 0.8rem; }
+.bento-item.size-sm .block-sub { font-size: 0.65rem; }
+.bento-item.size-sm .block-body { font-size: 0.75rem; }
+.bento-item.size-sm .type-text .block-title { font-size: 1rem; }
+
+@media (min-width: 640px) {
+  .bento-item.size-xs .block-title { font-size: 0.85rem; }
+  .bento-item.size-xs .block-sub { font-size: 0.65rem; }
+  .bento-item.size-xs .type-text .block-title { font-size: 1rem; }
+  .bento-item.size-sm .block-title { font-size: 0.95rem; }
+  .bento-item.size-sm .block-sub { font-size: 0.75rem; }
+  .bento-item.size-sm .type-text .block-title { font-size: 1.2rem; }
+}
+
+@media (min-width: 1024px) {
+  .bento-item.size-xs .block-title { font-size: 0.95rem; }
+  .bento-item.size-xs .block-sub { font-size: 0.7rem; }
+  .bento-item.size-xs .block-body { font-size: 0.85rem; }
+  .bento-item.size-xs .type-text .block-title { font-size: 1.1rem; }
+  .bento-item.size-sm .block-title { font-size: 1.05rem; }
+  .bento-item.size-sm .block-sub { font-size: 0.8rem; }
+  .bento-item.size-sm .block-body { font-size: 0.95rem; }
+  .bento-item.size-sm .type-text .block-title { font-size: 1.35rem; }
+}
 
 .full-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
   position: absolute;
   top: 0; left: 0;
-  transition: transform 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
-.bento-item:hover .full-img { transform: scale(1.08); }
 
 /* YouTube Adaptive Styles */
 .yt-container {
@@ -563,8 +818,16 @@ footer a:hover {
 }
 
 @media (min-width: 640px) {
-  .bento-grid { grid-template-columns: repeat(2, 1fr); }
+  .bento-grid { grid-template-columns: repeat(9, 1fr); }
+  .col-span-1 { grid-column: span 1; }
   .col-span-2 { grid-column: span 2; }
+  .col-span-3 { grid-column: span 3; }
+  .col-span-4 { grid-column: span 4; }
+  .col-span-5 { grid-column: span 5; }
+  .col-span-6 { grid-column: span 6; }
+  .col-span-7 { grid-column: span 7; }
+  .col-span-8 { grid-column: span 8; }
+  .col-span-9 { grid-column: span 9; }
   .row-span-2 { grid-row: span 2; }
 }
 
@@ -582,12 +845,9 @@ footer a:hover {
   .grid-section { padding: 6rem 4rem 4rem; }
   .avatar { width: 12rem; height: 12rem; }
   .profile-name { font-size: 3rem; }
+  .profile-socials { justify-content: flex-start; }
 }
 
-@media (min-width: 1280px) {
-  .bento-grid { grid-template-columns: repeat(3, 1fr); }
-  .col-span-3 { grid-column: span 3; }
-}
 `;
 
 const escapeAttr = (value: string) =>
@@ -598,71 +858,148 @@ const escapeAttr = (value: string) =>
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;');
 
-const generateJS = (opts: { analytics?: { enabled: boolean; endpoint: string; siteId: string } }) => `
+const generateJS = (opts: { analytics?: { enabled: boolean; supabaseUrl: string; anonKey: string; siteId: string } }) => `
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Analytics (page views + outbound clicks) ---
+    // --- Apple TV 3D Tilt Effect ---
+    const bentoItems = document.querySelectorAll('.bento-item:not(.no-hover)');
+
+    bentoItems.forEach(item => {
+        item.addEventListener('mousemove', (e) => {
+            const rect = item.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+
+            // Calculate rotation (max 10 degrees for subtle Apple TV effect)
+            const rotateX = ((y - centerY) / centerY) * -10;
+            const rotateY = ((x - centerX) / centerX) * 10;
+
+            // Calculate glare position
+            const glareX = (x / rect.width) * 100;
+            const glareY = (y / rect.height) * 100;
+
+            // Dynamic shadow based on tilt direction
+            const shadowX = rotateY * 1.5;
+            const shadowY = rotateX * -1.5;
+
+            item.style.transform = \`perspective(800px) rotateX(\${rotateX}deg) rotateY(\${rotateY}deg) scale3d(1.02, 1.02, 1.02)\`;
+            item.style.boxShadow = \`\${shadowX}px \${shadowY}px 25px rgba(0,0,0,0.15), 0 8px 30px rgba(0,0,0,0.1)\`;
+            item.style.transition = 'transform 0.1s ease-out, box-shadow 0.1s ease-out';
+            item.style.setProperty('--glare-x', glareX + '%');
+            item.style.setProperty('--glare-y', glareY + '%');
+        });
+
+        item.addEventListener('mouseleave', () => {
+            item.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+            item.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            item.style.transition = 'transform 0.5s ease-out, box-shadow 0.5s ease-out';
+        });
+
+        item.addEventListener('mouseenter', () => {
+            item.style.transition = 'transform 0.1s ease-out, box-shadow 0.1s ease-out';
+        });
+    });
+
+    // --- Analytics (page views + outbound clicks via Supabase REST API) ---
     const analytics = ${opts.analytics ? JSON.stringify(opts.analytics) : 'null'};
 
-    const track = async (payload) => {
-        if (!analytics) return;
+    // Generate unique visitor ID (persisted in localStorage)
+    const getVisitorId = () => {
+        let id = localStorage.getItem('_ob_vid');
+        if (!id) {
+            id = 'v_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+            localStorage.setItem('_ob_vid', id);
+        }
+        return id;
+    };
+
+    // Session tracking
+    const sessionStart = Date.now();
+    let maxScroll = 0;
+    let lastActivity = Date.now();
+
+    // Track scroll depth
+    window.addEventListener('scroll', () => {
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollPercent = docHeight > 0 ? Math.round((scrollTop / docHeight) * 100) : 0;
+        maxScroll = Math.max(maxScroll, scrollPercent);
+        lastActivity = Date.now();
+    }, { passive: true });
+
+    const track = async (eventType, extra = {}) => {
+        if (!analytics || !analytics.supabaseUrl || !analytics.anonKey) return;
         try {
-            const body = JSON.stringify(payload);
-            if (navigator.sendBeacon) {
-                const blob = new Blob([body], { type: 'application/json' });
-                navigator.sendBeacon(analytics.endpoint, blob);
-                return;
-            }
-            fetch(analytics.endpoint, {
+            const utm = new URLSearchParams(window.location.search);
+            const payload = {
+                site_id: analytics.siteId,
+                event_type: eventType,
+                visitor_id: getVisitorId(),
+                session_id: sessionStart.toString(36),
+                page_url: window.location.href,
+                referrer: document.referrer || null,
+                utm_source: utm.get('utm_source') || null,
+                utm_medium: utm.get('utm_medium') || null,
+                utm_campaign: utm.get('utm_campaign') || null,
+                utm_term: utm.get('utm_term') || null,
+                utm_content: utm.get('utm_content') || null,
+                user_agent: navigator.userAgent,
+                language: navigator.language,
+                screen_w: window.screen?.width || null,
+                screen_h: window.screen?.height || null,
+                viewport_w: window.innerWidth || null,
+                viewport_h: window.innerHeight || null,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
+                ...extra
+            };
+            const endpoint = analytics.supabaseUrl + '/rest/v1/openbento_analytics_events';
+            const headers = {
+                'Content-Type': 'application/json',
+                'apikey': analytics.anonKey,
+                'Authorization': 'Bearer ' + analytics.anonKey,
+                'Prefer': 'return=minimal'
+            };
+            fetch(endpoint, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body,
+                headers,
+                body: JSON.stringify(payload),
                 keepalive: true
             }).catch(() => {});
         } catch (_) {}
     };
 
-    const getUtm = () => {
-        const params = new URLSearchParams(window.location.search);
-        return {
-            source: params.get('utm_source') || undefined,
-            medium: params.get('utm_medium') || undefined,
-            campaign: params.get('utm_campaign') || undefined,
-            term: params.get('utm_term') || undefined,
-            content: params.get('utm_content') || undefined,
-        };
-    };
+    // Track page view
+    track('page_view');
 
-    track({
-        siteId: analytics?.siteId,
-        event: 'page_view',
-        pageUrl: window.location.href,
-        referrer: document.referrer || undefined,
-        utm: getUtm(),
-        language: navigator.language,
-        screenW: window.screen?.width,
-        screenH: window.screen?.height
-    });
-
+    // Track clicks on bento items
     document.addEventListener('click', (ev) => {
         const target = ev.target;
         if (!(target instanceof Element)) return;
         const link = target.closest('a.bento-item');
         if (!link) return;
-        const blockId = link.getAttribute('data-block-id') || undefined;
-        const destinationUrl = link.getAttribute('href') || undefined;
-        track({
-            siteId: analytics?.siteId,
-            event: 'click',
-            blockId,
-            destinationUrl,
-            pageUrl: window.location.href,
-            referrer: document.referrer || undefined,
-            utm: getUtm(),
-            language: navigator.language,
-            screenW: window.screen?.width,
-            screenH: window.screen?.height
+        track('click', {
+            block_id: link.getAttribute('data-block-id') || null,
+            destination_url: link.getAttribute('href') || null,
+            block_title: link.querySelector('.block-title')?.textContent || null
         });
     }, { capture: true });
+
+    // Track session end (time on page, scroll depth)
+    const trackSessionEnd = () => {
+        const duration = Math.round((Date.now() - sessionStart) / 1000);
+        track('session_end', {
+            duration_seconds: duration,
+            scroll_depth: maxScroll,
+            engaged: duration > 10 && maxScroll > 25
+        });
+    };
+
+    // Send session_end on page unload
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') trackSessionEnd();
+    });
+    window.addEventListener('pagehide', trackSessionEnd);
 
     // YouTube Fetcher
     const fetchers = document.querySelectorAll('.youtube-fetcher');
@@ -752,6 +1089,53 @@ const generateHtml = (data: SiteData, imageMap: Record<string, string>): string 
   const { profile, blocks } = data;
   const avatarSrc = imageMap['profile_avatar'] || profile.avatarUrl;
   const showBranding = profile.showBranding !== false;
+
+  const resolvedAvatarStyle = profile.avatarStyle || {
+    shape: 'rounded',
+    shadow: true,
+    border: true,
+    borderColor: '#ffffff',
+    borderWidth: 4,
+  };
+  const avatarRadius =
+    resolvedAvatarStyle.shape === 'circle'
+      ? '9999px'
+      : resolvedAvatarStyle.shape === 'square'
+        ? '0'
+        : '1.5rem';
+  const avatarShadow = resolvedAvatarStyle.shadow === false
+    ? 'none'
+    : '0 25px 50px -12px rgba(0,0,0,0.15)';
+  const avatarBorder = resolvedAvatarStyle.border === false
+    ? 'none'
+    : `${resolvedAvatarStyle.borderWidth || 4}px solid ${resolvedAvatarStyle.borderColor || '#ffffff'}`;
+  const avatarInlineStyle = `border-radius:${avatarRadius}; box-shadow:${avatarShadow}; border:${avatarBorder};`;
+
+  const socialHeaderHtml = (() => {
+    const accounts = profile.socialAccounts || [];
+    if (!profile.showSocialInHeader || accounts.length === 0) return '';
+
+    const items = accounts.map(account => {
+      const option = getSocialPlatformOption(account.platform);
+      const label = option?.label || account.platform;
+      const url = buildSocialUrl(account.platform, account.handle);
+      const count = profile.showFollowerCount ? formatFollowerCount(account.followerCount) : '';
+      const hasCount = Boolean(count);
+      const iconColor = option?.brandColor;
+      const iconSrc = getSimpleIconSrc(account.platform, iconColor);
+      const fallbackLetter = label.slice(0, 1).toUpperCase();
+      const iconHtml = iconSrc
+        ? `<span class="social-icon"><span class="social-fallback">${fallbackLetter}</span><img src="${iconSrc}" alt="${escapeAttr(label)}" onerror="this.style.display='none';" /></span>`
+        : `<span class="social-icon"><span class="social-fallback">${fallbackLetter}</span></span>`;
+      const countHtml = hasCount ? `<span class="social-count">${count}</span>` : '';
+      const cls = hasCount ? 'profile-social' : 'profile-social icon-only';
+      const tag = url ? 'a' : 'div';
+      const href = url ? `href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer"` : '';
+      return `<${tag} class="${cls}" ${href}>${iconHtml}${countHtml}</${tag}>`;
+    });
+
+    return `<div class="profile-socials">${items.join('')}</div>`;
+  })();
   
   // Sort blocks by grid position (row first, then column) for correct visual order
   const sortedBlocks = [...blocks].sort((a, b) => {
@@ -766,6 +1150,8 @@ const generateHtml = (data: SiteData, imageMap: Record<string, string>): string 
   const renderBlock = (block: BlockData) => {
     let contentHtml = '';
     const blockImageSrc = block.imageUrl ? (imageMap[`block_${block.id}`] || block.imageUrl) : '';
+    let explicitHref: string | null = null;
+    let extraClass = '';
 
     let bgStyle = '';
     if (block.customBackground) {
@@ -776,8 +1162,18 @@ const generateHtml = (data: SiteData, imageMap: Record<string, string>): string 
 
     const textStyle = getStyleFromClass(block.textColor, 'text');
     
-    const colClass = block.colSpan === 3 ? 'col-span-3' : block.colSpan === 2 ? 'col-span-2' : '';
+    const colSpan = Math.min(block.colSpan, 9);
+    const colClass = `col-span-${colSpan}`;
     const rowClass = block.rowSpan === 2 ? 'row-span-2' : '';
+    const sizeTier = (() => {
+      const minDim = Math.min(block.colSpan, block.rowSpan);
+      const area = block.colSpan * block.rowSpan;
+      if (minDim <= 1 || area <= 4) return 'xs';
+      if (minDim <= 2 || area <= 8) return 'sm';
+      if (minDim <= 3 || area <= 12) return 'md';
+      return 'lg';
+    })();
+    const sizeClass = `size-${sizeTier}`;
     const isSpacer = block.type === BlockType.SPACER;
     const isInteractive = !isSpacer;
 
@@ -838,6 +1234,13 @@ const generateHtml = (data: SiteData, imageMap: Record<string, string>): string 
         switch (block.type) {
             case BlockType.MEDIA:
                 contentHtml = `<img src="${blockImageSrc}" class="full-img" alt="${block.title || ''}" />`;
+                if (block.title) {
+                  contentHtml += `
+                  <div class="media-overlay">
+                    <div class="media-title">${block.title}</div>
+                    ${block.subtext ? `<div class="media-subtext">${block.subtext}</div>` : ''}
+                  </div>`;
+                }
                 break;
             case BlockType.MAP:
                 contentHtml = `<iframe width="100%" height="100%" frameborder="0" style="position:absolute; inset:0; filter:grayscale(0.5) contrast(1.1); pointer-events:none;" src="https://maps.google.com/maps?q=${encodeURIComponent(block.content || 'Paris')}&t=&z=13&ie=UTF8&iwloc=&output=embed"></iframe>`;
@@ -845,8 +1248,8 @@ const generateHtml = (data: SiteData, imageMap: Record<string, string>): string 
             case BlockType.TEXT:
                 contentHtml = `
                 <div class="content-wrapper type-text">
-                    <h3>${block.title || ''}</h3>
-                    <p style="opacity:0.8; line-height:1.6; font-size:1.1rem;">${block.content || ''}</p>
+                    <h3 class="block-title">${block.title || ''}</h3>
+                    <p class="block-body">${block.content || ''}</p>
                 </div>`;
                 break;
             case BlockType.SOCIAL:
@@ -855,22 +1258,32 @@ const generateHtml = (data: SiteData, imageMap: Record<string, string>): string 
                 if (isLinkWithImage) {
                      contentHtml = `
                      <div style="position:absolute; inset:0; background-image:url('${blockImageSrc}'); background-size:cover; background-position:center;" class="full-img"></div>
-	                     <div style="position:absolute; inset:0; background:rgba(0,0,0,0.5);"></div>
-                     <div class="content-wrapper" style="color:white; z-index:2;">
-                         <div class="icon-box" style="background:rgba(255,255,255,0.25); color:white; backdrop-filter:blur(5px); border:1px solid rgba(255,255,255,0.3);">
-                              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
-                         </div>
-                         <div>
-                             <div class="block-title" style="text-shadow:0 2px 4px rgba(0,0,0,0.2);">${block.title || 'Link'}</div>
-                             <div class="block-sub" style="opacity:0.9;">${block.subtext || ''}</div>
-                         </div>
+                     <div class="media-overlay">
+                       <div class="media-title">${block.title || 'Link'}</div>
+                       ${block.subtext ? `<div class="media-subtext">${block.subtext}</div>` : ''}
                      </div>`;
                 } else {
+                     if (block.type === BlockType.SOCIAL) {
+                       const option = getSocialPlatformOption(block.socialPlatform);
+                       const label = option?.label || 'Social';
+                       const iconColor = resolveIconColor(block.textColor, option?.brandColor);
+                       const iconSrc = getSimpleIconSrc(block.socialPlatform, iconColor);
+                       const fallbackLetter = label.slice(0, 1).toUpperCase();
+                       const iconHtml = iconSrc
+                         ? `<img src="${iconSrc}" alt="${escapeAttr(label)}" onerror="this.style.display='none';" />`
+                         : `<span class="icon-fallback">${fallbackLetter}</span>`;
+                       contentHtml = `
+                        <div class="content-wrapper">
+                          <div class="icon-box">${iconHtml}</div>
+                          <div>
+                            <div class="block-title">${block.title || 'Link'}</div>
+                            <div class="block-sub">${block.subtext || ''}</div>
+                          </div>
+                        </div>`;
+                       break;
+                     }
                      contentHtml = `
-                     <div class="content-wrapper">
-                         <div class="icon-box" style="background:${block.textColor === 'text-white' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.9)'}; color: ${block.textColor === 'text-white' ? 'white' : 'black'}; backdrop-filter:blur(4px);">
-                              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
-                         </div>
+                     <div class="content-wrapper link-only">
                          <div>
                              <div class="block-title">${block.title || 'Link'}</div>
                              <div class="block-sub">${block.subtext || ''}</div>
@@ -878,14 +1291,31 @@ const generateHtml = (data: SiteData, imageMap: Record<string, string>): string 
                      </div>`;
                 }
                 break;
+            case BlockType.SOCIAL_ICON: {
+                const option = getSocialPlatformOption(block.socialPlatform);
+                const label = option?.label || 'Social';
+                const iconColor = resolveIconColor(block.textColor, option?.brandColor);
+                const iconSrc = getSimpleIconSrc(block.socialPlatform, iconColor);
+                const fallbackLetter = label.slice(0, 1).toUpperCase();
+                const iconHtml = iconSrc
+                  ? `<div class="social-icon"><span class="social-fallback">${fallbackLetter}</span><img src="${iconSrc}" alt="${escapeAttr(label)}" onerror="this.style.display='none';" /></div>`
+                  : `<div class="social-icon"><span class="social-fallback">${fallbackLetter}</span></div>`;
+                contentHtml = iconHtml;
+                explicitHref = buildSocialUrl(block.socialPlatform, block.socialHandle) || null;
+                extraClass = 'social-icon-block';
+                break;
+            }
             case BlockType.SPACER:
                 contentHtml = ''; 
                 break;
         }
     }
 
-    const tag = (block.content && !block.channelId && block.type !== BlockType.TEXT) ? 'a' : 'div';
-    const href = tag === 'a' ? `href="${escapeAttr(block.content!)}" target="_blank" rel="noopener noreferrer"` : '';
+    const inferredHref =
+      explicitHref ||
+      (block.content && !block.channelId && block.type !== BlockType.TEXT ? block.content : '');
+    const tag = inferredHref ? 'a' : 'div';
+    const href = inferredHref ? `href="${escapeAttr(inferredHref)}" target="_blank" rel="noopener noreferrer"` : '';
     const analyticsAttrs = [
       `data-block-id="${escapeAttr(block.id)}"`,
       `data-block-type="${escapeAttr(block.type)}"`,
@@ -894,13 +1324,20 @@ const generateHtml = (data: SiteData, imageMap: Record<string, string>): string 
     ].filter(Boolean).join(' ');
     
     // Add explicit grid positioning for correct order
-    const gridPosition = block.gridColumn !== undefined && block.gridRow !== undefined 
-      ? `grid-column: ${block.gridColumn} / span ${Math.min(block.colSpan, 3)}; grid-row: ${block.gridRow} / span ${block.rowSpan};`
-      : '';
+    let gridPosition = '';
+    if (block.gridColumn !== undefined && block.gridRow !== undefined) {
+      gridPosition = `grid-column: ${block.gridColumn} / span ${colSpan}; grid-row: ${block.gridRow} / span ${block.rowSpan};`;
+    } else if (block.gridColumn !== undefined) {
+      gridPosition = `grid-column: ${block.gridColumn} / span ${colSpan}; grid-row: span ${block.rowSpan};`;
+    } else if (block.gridRow !== undefined) {
+      gridPosition = `grid-column: span ${colSpan}; grid-row: ${block.gridRow} / span ${block.rowSpan};`;
+    } else {
+      gridPosition = `grid-column: span ${colSpan}; grid-row: span ${block.rowSpan};`;
+    }
     const style = `background: ${bgStyle}; color: ${textStyle}; ${gridPosition}`;
     const noHover = !isInteractive ? 'no-hover' : '';
 
-    return `<${tag} ${href} ${analyticsAttrs} class="bento-item ${colClass} ${rowClass} ${noHover}" style="${style}">${contentHtml}</${tag}>`;
+    return `<${tag} ${href} ${analyticsAttrs} class="bento-item ${colClass} ${rowClass} ${noHover} ${extraClass} ${sizeClass}" style="${style}">${contentHtml}</${tag}>`;
   };
 
   return `<!DOCTYPE html>
@@ -918,9 +1355,10 @@ const generateHtml = (data: SiteData, imageMap: Record<string, string>): string 
     <div class="container">
         <!-- Profile -->
         <div class="profile-section">
-            <div class="avatar"><img src="${avatarSrc}" alt="${profile.name}"></div>
+            <div class="avatar" style="${avatarInlineStyle}"><img src="${avatarSrc}" alt="${profile.name}"></div>
             <h1 class="profile-name">${profile.name}</h1>
             <p class="profile-bio">${profile.bio}</p>
+            ${socialHeaderHtml}
         </div>
 
         <!-- Grid -->
@@ -942,11 +1380,13 @@ export const generatePreviewSrcDoc = (data: SiteData, opts?: { siteId?: string }
   const css = generateCSS(data.profile.name);
 
   const analyticsSupabaseUrl = data.profile.analytics?.supabaseUrl?.trim().replace(/\/+$/, '') || '';
-  const analyticsEnabled = !!(data.profile.analytics?.enabled && analyticsSupabaseUrl && opts?.siteId);
+  const analyticsAnonKey = data.profile.analytics?.anonKey?.trim() || '';
+  const analyticsEnabled = !!(data.profile.analytics?.enabled && analyticsSupabaseUrl && analyticsAnonKey && opts?.siteId);
   const analytics = analyticsEnabled
     ? {
         enabled: true,
-        endpoint: `${analyticsSupabaseUrl}/functions/v1/openbento-analytics-track`,
+        supabaseUrl: analyticsSupabaseUrl,
+        anonKey: analyticsAnonKey,
         siteId: opts!.siteId!,
       }
     : undefined;
@@ -1170,11 +1610,13 @@ export const exportSite = async (
   zip.file("styles.css", generateCSS(data.profile.name));
 
   const analyticsSupabaseUrl = data.profile.analytics?.supabaseUrl?.trim().replace(/\/+$/, '') || '';
-  const analyticsEnabled = !!(data.profile.analytics?.enabled && analyticsSupabaseUrl && opts?.siteId);
+  const analyticsAnonKey = data.profile.analytics?.anonKey?.trim() || '';
+  const analyticsEnabled = !!(data.profile.analytics?.enabled && analyticsSupabaseUrl && analyticsAnonKey && opts?.siteId);
   const analytics = analyticsEnabled
     ? {
         enabled: true,
-        endpoint: `${analyticsSupabaseUrl}/functions/v1/openbento-analytics-track`,
+        supabaseUrl: analyticsSupabaseUrl,
+        anonKey: analyticsAnonKey,
         siteId: opts!.siteId!,
       }
     : undefined;
@@ -1192,7 +1634,7 @@ export const exportSite = async (
       deploymentTarget,
       analyticsEnabled,
       siteId: opts?.siteId,
-      analyticsEndpoint: analytics?.endpoint,
+      analyticsEndpoint: analyticsSupabaseUrl ? `${analyticsSupabaseUrl}/rest/v1/openbento_analytics_events` : undefined,
     }),
   );
 

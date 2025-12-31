@@ -5,6 +5,7 @@ const STORAGE_KEY = 'openbento_bentos';
 const ACTIVE_BENTO_KEY = 'openbento_active_bento';
 const ASSETS_KEY = 'openbento_assets';
 const INITIALIZED_KEY = 'openbento_initialized';
+export const GRID_VERSION = 2;
 
 // Asset type for uploaded images
 export interface Asset {
@@ -22,6 +23,7 @@ export interface BentoJSON {
   version: string;
   profile: UserProfile;
   blocks: BlockData[];
+  gridVersion?: number;
   exportedAt?: number;
 }
 
@@ -88,6 +90,7 @@ export const createBentoFromJSON = async (templatePath: string = '/bentos/defaul
       createdAt: now,
       updatedAt: now,
       data: {
+        gridVersion: template.gridVersion ?? GRID_VERSION,
         profile: {
           ...template.profile,
           avatarUrl: template.profile.avatarUrl || AVATAR_PLACEHOLDER
@@ -119,6 +122,7 @@ export const createBento = (name: string): SavedBento => {
     createdAt: now,
     updatedAt: now,
     data: {
+      gridVersion: GRID_VERSION,
       profile: {
         name: name || 'My Bento',
         bio: 'Digital creator & developer.\nBuilding awesome things.',
@@ -276,6 +280,7 @@ export const exportBentoToJSON = (bento: SavedBento): BentoJSON => {
     version: '1.0',
     profile: bento.data.profile,
     blocks: bento.data.blocks,
+    gridVersion: bento.data.gridVersion ?? GRID_VERSION,
     exportedAt: Date.now()
   };
 };
@@ -305,6 +310,7 @@ export const importBentoFromJSON = (json: BentoJSON): SavedBento => {
     createdAt: now,
     updatedAt: now,
     data: {
+      gridVersion: json.gridVersion ?? GRID_VERSION,
       profile: {
         name: json.profile?.name || 'My Bento',
         bio: json.profile?.bio || '',

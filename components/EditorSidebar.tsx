@@ -497,19 +497,19 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Video Layout</label>
                             <div className="grid grid-cols-3 gap-2">
                                 <button 
-                                    onClick={() => updateBlock({...editingBlock, youtubeMode: 'single', colSpan: 1, rowSpan: 1})}
+                                    onClick={() => updateBlock({...editingBlock, youtubeMode: 'single', colSpan: 3, rowSpan: 3})}
                                     className={`p-2 rounded-xl text-xs font-medium border flex flex-col items-center justify-center gap-2 h-20 transition-all ${editingBlock.youtubeMode === 'single' || !editingBlock.youtubeMode ? 'bg-red-500 text-white border-red-500 shadow-md ring-2 ring-red-200' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
                                 >
                                     <Square size={20}/> Single
                                 </button>
                                 <button 
-                                    onClick={() => updateBlock({...editingBlock, youtubeMode: 'grid', colSpan: 2, rowSpan: 2})}
+                                    onClick={() => updateBlock({...editingBlock, youtubeMode: 'grid', colSpan: 6, rowSpan: 6})}
                                     className={`p-2 rounded-xl text-xs font-medium border flex flex-col items-center justify-center gap-2 h-20 transition-all ${editingBlock.youtubeMode === 'grid' ? 'bg-red-500 text-white border-red-500 shadow-md ring-2 ring-red-200' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
                                 >
                                     <Grid3X3 size={20}/> Grid
                                 </button>
                                 <button 
-                                    onClick={() => updateBlock({...editingBlock, youtubeMode: 'list', colSpan: 2, rowSpan: 2})}
+                                    onClick={() => updateBlock({...editingBlock, youtubeMode: 'list', colSpan: 6, rowSpan: 6})}
                                     className={`p-2 rounded-xl text-xs font-medium border flex flex-col items-center justify-center gap-2 h-20 transition-all ${editingBlock.youtubeMode === 'list' ? 'bg-red-500 text-white border-red-500 shadow-md ring-2 ring-red-200' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
                                 >
                                     <List size={20}/> List
