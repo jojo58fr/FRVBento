@@ -1181,8 +1181,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
 	                   <span className="hidden sm:inline">Settings</span>
 	                 </button>
 
-	                 {import.meta.env.DEV && (
-	                   <button
+	                 <button
                      onClick={() => {
                       const previewPath = `${import.meta.env.BASE_URL}preview`;
                       window.open(previewPath, '_blank', 'noopener,noreferrer');
@@ -1193,7 +1192,6 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
 	                     <Globe size={16} />
 	                     <span className="hidden sm:inline">Preview</span>
 	                   </button>
-	                 )}
 
 	                 {(import.meta.env.DEV || profile?.analytics?.enabled) && (
 	                   <a
