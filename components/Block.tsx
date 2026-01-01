@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { BlockData, BlockType } from '../types';
-import { MapPin, Type, Image as ImageIcon, Link as LinkIcon, Twitter, Github, Linkedin, Youtube, Instagram, GripHorizontal, MoveVertical, Play, Loader2, ExternalLink, Pencil, Move, Check, X, Trash2 } from 'lucide-react';
+import { Youtube, MoveVertical, Play, Loader2, Pencil, Move, Check, X, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getSocialPlatformOption, inferSocialPlatformFromUrl } from '../socialPlatforms';
 
@@ -74,6 +74,7 @@ interface BlockProps {
   onResizeStart?: (block: BlockData, e: React.PointerEvent<HTMLButtonElement>) => void;
   onInlineUpdate?: (block: BlockData) => void;
   enableTiltEffect?: boolean; // Apple TV style 3D tilt on hover
+  previewMode?: boolean; // In preview mode, clicks navigate to URLs instead of editing
 }
 
 const Block: React.FC<BlockProps> = ({
@@ -92,6 +93,7 @@ const Block: React.FC<BlockProps> = ({
   onResizeStart,
   onInlineUpdate,
   enableTiltEffect,
+  previewMode,
 }) => {
   // Apple TV tilt effect
   const { elementRef: tiltRef, tiltStyle, handleMouseMove: onTiltMove, handleMouseLeave: onTiltLeave, handleMouseEnter: onTiltEnter } = useTiltEffect(enableTiltEffect);
@@ -270,33 +272,6 @@ const Block: React.FC<BlockProps> = ({
     }
   }, [block.channelId, block.youtubeVideos, block.type]);
 
-
-  const getIcon = () => {
-    switch (block.type) {
-      case BlockType.SOCIAL:
-        if (block.channelId || block.title?.toLowerCase().includes('youtube') || block.content?.includes('youtube') || block.content?.includes('youtu.be')) {
-          return <Youtube className="w-5 h-5" />;
-        }
-
-        {
-          const platform = block.socialPlatform ?? inferSocialPlatformFromUrl(block.content);
-          const PlatformIcon = platform ? getSocialPlatformOption(platform)?.icon : undefined;
-          if (PlatformIcon) return <PlatformIcon className="w-5 h-5" />;
-        }
-
-        // Backward-compatible heuristics for older saved data
-        if (block.content?.includes('twitter') || block.content?.includes('x.com')) return <Twitter className="w-5 h-5" />;
-        if (block.content?.includes('github')) return <Github className="w-5 h-5" />;
-        if (block.content?.includes('linkedin')) return <Linkedin className="w-5 h-5" />;
-        if (block.content?.includes('instagram')) return <Instagram className="w-5 h-5" />;
-        return <LinkIcon className="w-5 h-5" />;
-      case BlockType.MAP: return <MapPin className="w-5 h-5" />;
-      case BlockType.MEDIA: return <ImageIcon className="w-5 h-5" />;
-      case BlockType.TEXT: return <Type className="w-5 h-5" />;
-      case BlockType.SPACER: return <MoveVertical className="w-5 h-5" />;
-      default: return <LinkIcon className="w-5 h-5" />;
-    }
-  };
 
   const colClass = block.colSpan === 3 ? 'md:col-span-3 lg:col-span-3' : block.colSpan === 2 ? 'md:col-span-2 lg:col-span-2' : 'md:col-span-1 lg:col-span-1';
   const rowClass = block.rowSpan === 2 ? 'md:row-span-2' : 'md:row-span-1';
@@ -530,18 +505,20 @@ const Block: React.FC<BlockProps> = ({
           />
         ) : null}
 
-        {/* Delete button - appears on hover */}
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onDelete(block.id);
-          }}
-          className="absolute top-1 left-1 p-1 bg-red-500/80 hover:bg-red-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-20"
-          title="Delete"
-        >
-          <Trash2 size={12} />
-        </button>
+        {/* Delete button - appears on hover (not in preview mode) */}
+        {!previewMode && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete(block.id);
+            }}
+            className="absolute top-1 left-1 p-1 bg-red-500/80 hover:bg-red-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-20"
+            title="Delete"
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
 
         {resizeHandle}
       </motion.a>
@@ -620,13 +597,23 @@ const Block: React.FC<BlockProps> = ({
         onDragOver={(e) => e.preventDefault()}
         onDragEnd={onDragEnd}
         onDrop={(e) => { e.preventDefault(); onDrop(block.id); }}
-        onClick={() => onEdit(block)}
+        onClick={() => {
+          if (previewMode && block.channelId) {
+            window.open(`https://youtube.com/channel/${block.channelId}`, '_blank');
+          } else {
+            onEdit(block);
+          }
+        }}
         data-block-id={block.id}
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         whileHover={{ y: -4, transition: { duration: 0.2 } }}
-        style={{ ...gridPositionStyle, borderRadius }}
-        className={`bento-item group relative overflow-hidden bg-white ${colClass} ${rowClass} cursor-pointer h-full
+        style={{
+          ...gridPositionStyle,
+          borderRadius,
+          ...(block.customBackground ? { background: block.customBackground } : {}),
+        }}
+        className={`bento-item group relative overflow-hidden ${block.color || 'bg-white'} ${colClass} ${rowClass} cursor-pointer h-full
           ${isSelected ? 'ring-4 ring-blue-500 shadow-xl z-20' : 'ring-1 ring-black/5'}
           ${!isSelected ? 'shadow-sm hover:shadow-xl' : ''}
           ${isDragTarget ? 'ring-2 ring-violet-500 z-20 scale-[1.02]' : ''}
@@ -638,47 +625,47 @@ const Block: React.FC<BlockProps> = ({
         {isDragTarget && (
           <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-1.5 h-16 bg-violet-500 rounded-full shadow-md shadow-violet-500/30 animate-pulse z-30" />
         )}
-	        <div className="absolute top-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 z-20 pointer-events-none">
-	            <GripHorizontal size={20} />
-	        </div>
 	        {resizeHandle}
 
-	        {/* Mobile: horizontal layout (header left, videos right) | Desktop: vertical layout */}
-	        <div className={`w-full h-full pointer-events-none flex flex-row md:flex-col p-2 md:p-4 gap-2 md:gap-0`}>
-          {/* YouTube Header - Side on mobile, top on desktop */}
-          <div className={`flex flex-col md:flex-row items-center gap-1 md:gap-2 md:mb-3 md:pb-3 md:border-b border-gray-100 shrink-0 w-16 md:w-auto`}>
-            <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg md:rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm shrink-0">
-              <Youtube size={14} className="md:w-[18px] md:h-[18px]"/>
+	        {/* YouTube Grid Layout */}
+	        <div className="w-full h-full flex flex-col p-2 md:p-3">
+          {/* Header with YouTube icon and channel name */}
+          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
+            <div className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-red-600 text-white flex items-center justify-center shrink-0">
+              <Youtube size={12} className="md:w-[14px] md:h-[14px]"/>
             </div>
-            <div className="flex-1 min-w-0 text-center md:text-left">
-              <h3 className="text-[10px] md:text-sm font-bold text-gray-900 line-clamp-2 md:truncate leading-tight">{block.channelTitle || 'YouTube'}</h3>
-              <span className="hidden md:block text-[10px] text-gray-400 font-medium">Latest Videos</span>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-[10px] md:text-xs font-bold text-gray-900 truncate">{block.channelTitle || 'YouTube'}</h3>
+              <span className="text-[8px] md:text-[9px] text-gray-400 font-medium">Latest videos</span>
             </div>
           </div>
 
-          {/* Videos Content - Takes remaining space */}
+          {/* Videos Grid - Each video is clickable */}
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center">
-              <Loader2 className="animate-spin text-gray-300" size={18}/>
+              <Loader2 className="animate-spin text-gray-300" size={16}/>
             </div>
           ) : (
-            <div className="flex-1 grid grid-cols-2 gap-1 md:gap-2 overflow-hidden">
+            <div className="flex-1 grid grid-cols-2 gap-1 md:gap-1.5 overflow-hidden">
               {displayVideos.length > 0 ? displayVideos.slice(0, 4).map((vid, idx) => (
-                <div
+                <a
                   key={idx}
-                  className="relative overflow-hidden group/vid transition-all duration-200 rounded md:rounded-lg bg-gray-100"
-                  style={{ aspectRatio: '16/10' }}
+                  href={`https://youtube.com/watch?v=${vid.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="relative overflow-hidden group/vid rounded bg-gray-100 block"
                 >
                   <img src={vid.thumbnail} alt={vid.title} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/30" />
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/vid:opacity-100 transition-all duration-200">
-                    <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-red-500 flex items-center justify-center shadow-lg">
+                  <div className="absolute inset-0 bg-black/20 group-hover/vid:bg-black/40 transition-colors" />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/vid:opacity-100 transition-all">
+                    <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-red-500 flex items-center justify-center shadow-lg">
                       <Play size={10} className="md:w-3 md:h-3 text-white ml-0.5" fill="white" />
                     </div>
                   </div>
-                </div>
+                </a>
               )) : (
-                <div className="col-span-2 flex items-center justify-center text-[10px] text-gray-400 py-2">
+                <div className="col-span-2 flex items-center justify-center text-[9px] text-gray-400">
                   <span>No videos</span>
                 </div>
               )}
@@ -719,7 +706,21 @@ const Block: React.FC<BlockProps> = ({
       onDragOver={(e) => e.preventDefault()}
       onDragEnd={onDragEnd}
       onDrop={(e) => { e.preventDefault(); onDrop(block.id); }}
-      onClick={() => onEdit(block)}
+      onClick={() => {
+        if (previewMode) {
+          // In preview mode, navigate to block URL
+          let url = block.content;
+          if (block.type === BlockType.SOCIAL && block.socialPlatform && block.socialHandle) {
+            const option = getSocialPlatformOption(block.socialPlatform);
+            url = option?.buildUrl(block.socialHandle);
+          }
+          if (url) {
+            window.open(url, '_blank');
+          }
+        } else {
+          onEdit(block);
+        }
+      }}
       data-block-id={block.id}
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -757,22 +758,20 @@ const Block: React.FC<BlockProps> = ({
           }}
         />
       )}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-current/30 z-20 pointer-events-none">
-          <GripHorizontal size={20} />
-      </div>
-
-      {/* Delete button - appears on hover */}
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onDelete(block.id);
-        }}
-        className="absolute top-2 left-2 p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 backdrop-blur-sm"
-        title="Delete block"
-      >
-        <Trash2 size={14} />
-      </button>
+      {/* Delete button - appears on hover (not in preview mode) */}
+      {!previewMode && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDelete(block.id);
+          }}
+          className="absolute top-2 left-2 p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 backdrop-blur-sm"
+          title="Delete block"
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
 
       {resizeHandle}
 
@@ -932,77 +931,65 @@ const Block: React.FC<BlockProps> = ({
               )}
           </div>
         ) : block.type === BlockType.MAP ? (
-          /* MAP BLOCK */
+          /* MAP BLOCK - Clean minimal */
           <div className="w-full h-full relative bg-gray-100 overflow-hidden">
-              <iframe 
-                  width="100%" 
-                  height="100%" 
-                  className="opacity-90 grayscale-[30%] group-hover:grayscale-0 transition-all duration-500"
+              <iframe
+                  width="100%"
+                  height="100%"
+                  className="opacity-95 grayscale-[20%] group-hover:grayscale-0 transition-all duration-500"
                   src={`https://maps.google.com/maps?q=${encodeURIComponent(block.content || 'Paris')}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
                   loading="lazy"
               ></iframe>
-              <div className="absolute bottom-0 left-0 right-0 p-6 bg-black/60 text-white">
-                  <p className={`font-bold flex items-center gap-2 ${textSizes.overlayTitle}`}><MapPin size={18}/> {block.title}</p>
-              </div>
+              {block.title && (
+                <div className="absolute bottom-0 left-0 right-0 p-2 md:p-3 bg-gradient-to-t from-black/60 to-transparent">
+                  <p className={`font-semibold text-white drop-shadow ${textSizes.overlayTitle}`}>{block.title}</p>
+                </div>
+              )}
           </div>
         ) : isRichYoutube ? (
-          /* YOUTUBE SINGLE VIDEO */
-          <div className="w-full h-full flex flex-col justify-between p-2 md:p-4 lg:p-6">
-            {/* Top: YouTube Icon */}
-            <div className="flex justify-between items-start">
-              <div className="w-7 h-7 md:w-10 md:h-10 lg:w-12 lg:h-12 rounded-lg md:rounded-xl lg:rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shadow-lg">
-                <Youtube size={14} className="md:w-[18px] md:h-[18px] lg:w-[22px] lg:h-[22px]"/>
-              </div>
-            </div>
-
+          /* YOUTUBE SINGLE VIDEO - Clean design with just play button */
+          <div className="w-full h-full relative">
             {/* Center: Play Button */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-8 h-8 md:w-12 md:h-12 lg:w-16 lg:h-16 rounded-full bg-red-500 flex items-center justify-center shadow-2xl shadow-red-500/30 transform group-hover:scale-110 transition-transform duration-300">
-                <Play size={14} className="md:w-5 md:h-5 lg:w-7 lg:h-7 text-white ml-0.5" fill="white" />
+              <div className="w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 rounded-full bg-red-500 flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-300">
+                <Play size={12} className="md:w-4 md:h-4 lg:w-5 lg:h-5 text-white ml-0.5" fill="white" />
               </div>
             </div>
 
-            {/* Bottom: Info */}
-            <div className="mt-auto">
-              <div className="-mx-2 -mb-2 md:-mx-4 md:-mb-4 lg:-mx-6 lg:-mb-6 p-2 md:p-3 lg:p-5">
-                <h3 className={`font-bold text-white leading-tight drop-shadow-lg ${textSizes.overlayTitle}`}>{block.channelTitle || block.title}</h3>
-                {block.subtext && <p className={`text-white/80 mt-0.5 md:mt-1 font-medium drop-shadow ${textSizes.overlaySubtext}`}>{block.subtext}</p>}
+            {/* Bottom: Title only */}
+            {(block.channelTitle || block.title) && (
+              <div className="absolute bottom-0 left-0 right-0 p-2 md:p-3">
+                <h3 className={`font-semibold text-white leading-tight drop-shadow-lg line-clamp-1 ${textSizes.overlayTitle}`}>{block.channelTitle || block.title}</h3>
               </div>
-            </div>
+            )}
           </div>
         ) : (
-          /* DEFAULT BLOCK (Link, Social, Text) */
-          <div className="p-3 md:p-4 lg:p-6 h-full flex flex-col justify-between relative">
-            <div className="flex justify-between items-start">
-               {/* Only show icon for SOCIAL blocks, not LINK or TEXT */}
-               {block.type === BlockType.SOCIAL && (() => {
-                 const platform = block.socialPlatform ?? inferSocialPlatformFromUrl(block.content);
-                 const option = platform ? getSocialPlatformOption(platform) : undefined;
-                 const BrandIcon = option?.brandIcon;
-                 const FallbackIcon = option?.icon;
-                 const brandColor = option?.brandColor;
+          /* DEFAULT BLOCK (Link, Social, Text) - Clean minimal design */
+          <div className="p-2 md:p-3 lg:p-4 h-full flex flex-col justify-between relative">
+            {/* Icon for SOCIAL blocks only */}
+            {block.type === BlockType.SOCIAL && (() => {
+              const platform = block.socialPlatform ?? inferSocialPlatformFromUrl(block.content);
+              const option = platform ? getSocialPlatformOption(platform) : undefined;
+              const BrandIcon = option?.brandIcon;
+              const FallbackIcon = option?.icon;
+              const brandColor = option?.brandColor;
+              const useColor = block.textColor === 'text-brand';
+              const iconColor = useColor ? brandColor : undefined;
 
-                 // Support icon color modes like SOCIAL_ICON
-                 const useColor = block.textColor === 'text-brand';
-                 const iconColor = useColor ? brandColor : undefined;
-
-                 return (
-                   <div className={`w-8 h-8 md:w-10 md:h-10 lg:w-11 lg:h-11 rounded-xl md:rounded-2xl flex items-center justify-center shadow-sm ${
-                     block.textColor === 'text-white' || isLinkWithImage
-                       ? 'bg-white/20 text-white backdrop-blur-md'
-                       : 'bg-white/90 shadow-md'
-                   }`}>
-                     {BrandIcon ? (
-                       <BrandIcon size={20} style={iconColor ? { color: iconColor } : undefined} />
-                     ) : FallbackIcon ? (
-                       <FallbackIcon size={20} style={iconColor ? { color: iconColor } : undefined} />
-                     ) : (
-                       getIcon()
-                     )}
-                   </div>
-                 );
-               })()}
-            </div>
+              return (
+                <div className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                  block.textColor === 'text-white' || isLinkWithImage
+                    ? 'bg-white/20 text-white backdrop-blur-sm'
+                    : 'bg-gray-100'
+                }`}>
+                  {BrandIcon ? (
+                    <BrandIcon size={14} className="md:w-4 md:h-4" style={iconColor ? { color: iconColor } : undefined} />
+                  ) : FallbackIcon ? (
+                    <FallbackIcon size={14} className="md:w-4 md:h-4" style={iconColor ? { color: iconColor } : undefined} />
+                  ) : null}
+                </div>
+              );
+            })()}
 
             <div className={`${block.type === BlockType.TEXT ? 'flex flex-col justify-center h-full' : 'mt-auto'}`}>
               {/* Editable Title */}

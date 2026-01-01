@@ -278,6 +278,7 @@ const PreviewPage: React.FC = () => {
                         onDragEnd={noop}
                         onDrop={noopId}
                         enableTiltEffect={true}
+                        previewMode={true}
                       />
                     </div>
                   );

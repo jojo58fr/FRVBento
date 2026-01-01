@@ -222,6 +222,82 @@ const resizeBlockAndResolve = (blocks: BlockData[], blockId: string, requestedCo
   return nextBlocks;
 };
 
+// Reflow grid: clear all positions and re-place blocks in order (compacts the grid)
+const reflowGrid = (blocks: BlockData[]): BlockData[] => {
+  if (blocks.length === 0) return blocks;
+
+  // Sort blocks by their current position (row first, then column)
+  const sorted = [...blocks].sort((a, b) => {
+    const aRow = a.gridRow ?? 999;
+    const bRow = b.gridRow ?? 999;
+    if (aRow !== bRow) return aRow - bRow;
+    const aCol = a.gridColumn ?? 999;
+    const bCol = b.gridColumn ?? 999;
+    return aCol - bCol;
+  });
+
+  // Clear all positions and re-place using auto-placement
+  const cleared = sorted.map(b => ({ ...b, gridColumn: undefined, gridRow: undefined }));
+
+  // Use ensureBlocksHavePositions to re-place all blocks
+  return ensureBlocksHavePositions(cleared as BlockData[]);
+};
+
+// Resolve overlaps: check all blocks and move any that overlap
+const resolveOverlaps = (blocks: BlockData[]): BlockData[] => {
+  if (blocks.length === 0) return blocks;
+
+  // Sort by position to maintain visual order
+  const sorted = [...blocks].sort((a, b) => {
+    const aRow = a.gridRow ?? 999;
+    const bRow = b.gridRow ?? 999;
+    if (aRow !== bRow) return aRow - bRow;
+    const aCol = a.gridColumn ?? 999;
+    const bCol = b.gridColumn ?? 999;
+    return aCol - bCol;
+  });
+
+  const result: BlockData[] = [];
+  const occupiedCells = new Set<string>();
+
+  const markOccupied = (block: BlockData) => {
+    if (block.gridColumn === undefined || block.gridRow === undefined) return;
+    const cols = Math.min(block.colSpan, GRID_COLS);
+    for (let c = block.gridColumn; c < block.gridColumn + cols; c++) {
+      for (let r = block.gridRow; r < block.gridRow + block.rowSpan; r++) {
+        occupiedCells.add(`${c}-${r}`);
+      }
+    }
+  };
+
+  const hasOverlap = (block: BlockData): boolean => {
+    if (block.gridColumn === undefined || block.gridRow === undefined) return false;
+    const cols = Math.min(block.colSpan, GRID_COLS);
+    for (let c = block.gridColumn; c < block.gridColumn + cols; c++) {
+      for (let r = block.gridRow; r < block.gridRow + block.rowSpan; r++) {
+        if (occupiedCells.has(`${c}-${r}`)) return true;
+      }
+    }
+    return false;
+  };
+
+  for (const block of sorted) {
+    if (block.gridColumn === undefined || block.gridRow === undefined || hasOverlap(block)) {
+      // Find new position for this block
+      const pos = findNextAvailablePosition(block, occupiedCells, 1);
+      const movedBlock = { ...block, gridColumn: pos.col, gridRow: pos.row };
+      markOccupied(movedBlock);
+      result.push(movedBlock);
+    } else {
+      // No overlap, keep position
+      markOccupied(block);
+      result.push(block);
+    }
+  }
+
+  return result;
+};
+
 const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   // Load initial data from localStorage
   const [activeBento, setActiveBento] = useState<SavedBento | null>(null);
@@ -366,13 +442,15 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     });
   }, [blocks, autoSave]);
 
-  // Handle blocks changes with auto-save
+  // Handle blocks changes with auto-save - always resolve overlaps
   const handleSetBlocks = useCallback((newBlocks: BlockData[] | ((prev: BlockData[]) => BlockData[])) => {
     setBlocks(prev => {
       const updated = typeof newBlocks === 'function' ? newBlocks(prev) : newBlocks;
       const normalized = ensureBlocksHavePositions(updated);
-      if (profile) autoSave(profile, normalized);
-      return normalized;
+      // Always resolve any overlaps to prevent blocks from stacking
+      const resolved = resolveOverlaps(normalized);
+      if (profile) autoSave(profile, resolved);
+      return resolved;
     });
   }, [profile, autoSave]);
 
@@ -449,11 +527,26 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   };
 
   const updateBlock = (updatedBlock: BlockData) => {
-    handleSetBlocks(blocks.map(b => b.id === updatedBlock.id ? updatedBlock : b));
+    const oldBlock = blocks.find(b => b.id === updatedBlock.id);
+    const sizeChanged = oldBlock && (
+      oldBlock.colSpan !== updatedBlock.colSpan ||
+      oldBlock.rowSpan !== updatedBlock.rowSpan
+    );
+
+    const updatedBlocks = blocks.map(b => b.id === updatedBlock.id ? updatedBlock : b);
+
+    // If size changed, reflow the entire grid to compact it
+    if (sizeChanged) {
+      handleSetBlocks(reflowGrid(updatedBlocks));
+    } else {
+      handleSetBlocks(updatedBlocks);
+    }
   };
 
   const deleteBlock = (id: string) => {
-    handleSetBlocks(blocks.filter(b => b.id !== id));
+    const remaining = blocks.filter(b => b.id !== id);
+    // Reflow to compact the grid after deletion
+    handleSetBlocks(reflowGrid(remaining));
     if (editingBlockId === id) setEditingBlockId(null);
   };
 
