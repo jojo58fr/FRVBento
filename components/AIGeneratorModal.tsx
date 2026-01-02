@@ -103,7 +103,9 @@ const AIGeneratorModal: React.FC<AIGeneratorModalProps> = ({
       userInfo.push(`- Social networks:\n${validUrls.map((url) => `  • ${url}`).join('\n')}`);
     }
 
-    userInfo.push(`- Desired visual style: ${VISUAL_STYLES.find((s) => s.value === visualStyle)?.label || visualStyle}`);
+    userInfo.push(
+      `- Desired visual style: ${VISUAL_STYLES.find((s) => s.value === visualStyle)?.label || visualStyle}`
+    );
 
     if (customRequest.trim()) {
       userInfo.push(`- Specific request: ${customRequest.trim()}`);
@@ -238,49 +240,73 @@ x, instagram, tiktok, youtube, github, gitlab, linkedin, facebook, twitch, dribb
 
 Apply these style guidelines:
 
-${visualStyle === 'modern' ? `### Modern Style
+${
+  visualStyle === 'modern'
+    ? `### Modern Style
 - Theme: "light"
 - Clean, contemporary look with subtle contrasts
 - Primary colors: violet, indigo, blue
 - Backgrounds: bg-white, bg-gray-100 for light blocks, bg-gray-900 for accent
 - Use subtle gradients: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-- Rounded corners, subtle shadows` : ''}
-${visualStyle === 'minimalist' ? `### Minimalist Style
+- Rounded corners, subtle shadows`
+    : ''
+}
+${
+  visualStyle === 'minimalist'
+    ? `### Minimalist Style
 - Theme: "light"
 - Simple, clean, lots of whitespace
 - Primary colors: gray, slate
 - Backgrounds: mostly bg-white, bg-gray-50, with one or two bg-gray-900 accents
 - Avoid gradients, keep it simple
-- Muted, neutral palette` : ''}
-${visualStyle === 'colorful' ? `### Colorful Style
+- Muted, neutral palette`
+    : ''
+}
+${
+  visualStyle === 'colorful'
+    ? `### Colorful Style
 - Theme: "light"
 - Vibrant, playful, dynamic
 - Mix multiple colors: pink, violet, cyan, amber, emerald
 - Backgrounds: bg-pink-500, bg-violet-500, bg-cyan-500, bg-amber-500
 - Use bold gradients: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
-- High contrast, energetic feel` : ''}
-${visualStyle === 'dark' ? `### Dark Style
+- High contrast, energetic feel`
+    : ''
+}
+${
+  visualStyle === 'dark'
+    ? `### Dark Style
 - Theme: "dark"
 - Elegant dark mode
 - backgroundColor: "#0f0f0f" or "#1a1a2e"
 - Primary colors: violet, purple, cyan for accents on dark
 - Backgrounds: bg-gray-900, bg-slate-800, bg-gray-800
 - Text: text-white, text-gray-100
-- Use glowing gradients: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)"` : ''}
-${visualStyle === 'professional' ? `### Professional Style
+- Use glowing gradients: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)"`
+    : ''
+}
+${
+  visualStyle === 'professional'
+    ? `### Professional Style
 - Theme: "light"
 - Corporate, serious, trustworthy
 - Primary colors: blue, slate, gray
 - Backgrounds: bg-blue-500, bg-slate-800, bg-white
 - Clean lines, no playful elements
-- Conservative color choices` : ''}
-${visualStyle === 'playful' ? `### Playful Style
+- Conservative color choices`
+    : ''
+}
+${
+  visualStyle === 'playful'
+    ? `### Playful Style
 - Theme: "light"
 - Fun, creative, quirky
 - Primary colors: pink, amber, cyan, violet
 - Backgrounds: bg-pink-500, bg-amber-100, bg-cyan-500
 - Use fun gradients: "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)"
-- Mix colors freely, be creative!` : ''}
+- Mix colors freely, be creative!`
+    : ''
+}
 
 ---
 
@@ -556,7 +582,9 @@ If data needs confirmation → First ask your questions, then provide the JSON a
                       <div className="text-sm text-violet-700">
                         <p className="font-medium">Use your favorite AI!</p>
                         <p className="text-violet-600 mt-0.5">
-                          This feature works with any AI chat: ChatGPT, Claude, Gemini, Mistral, Llama, or any other. Copy the prompt and paste it into your preferred AI assistant.
+                          This feature works with any AI chat: ChatGPT, Claude, Gemini, Mistral,
+                          Llama, or any other. Copy the prompt and paste it into your preferred AI
+                          assistant.
                         </p>
                       </div>
                     </div>
@@ -710,9 +738,13 @@ If data needs confirmation → First ask your questions, then provide the JSON a
                   <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-200">
                     <AlertTriangle size={20} className="text-amber-500 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-semibold text-amber-800">Warning: This will replace ALL your data</p>
+                      <p className="text-sm font-semibold text-amber-800">
+                        Warning: This will replace ALL your data
+                      </p>
                       <p className="text-sm text-amber-700 mt-1">
-                        Importing this JSON will create a <strong>new Bento</strong> and replace your current work. Make sure to export/save your current Bento first if you want to keep it.
+                        Importing this JSON will create a <strong>new Bento</strong> and replace
+                        your current work. Make sure to export/save your current Bento first if you
+                        want to keep it.
                       </p>
                     </div>
                   </div>
@@ -736,8 +768,8 @@ If data needs confirmation → First ask your questions, then provide the JSON a
                         jsonError
                           ? 'border-red-300 bg-red-50'
                           : importSuccess
-                          ? 'border-green-300 bg-green-50'
-                          : 'border-gray-200'
+                            ? 'border-green-300 bg-green-50'
+                            : 'border-gray-200'
                       }`}
                     />
                   </div>
