@@ -5,6 +5,7 @@ import EditorSidebar from './EditorSidebar';
 import ProfileDropdown from './ProfileDropdown';
 import SettingsModal from './SettingsModal';
 import ImageCropModal from './ImageCropModal';
+import { useHistory } from '../hooks/useHistory';
 import AvatarStyleModal from './AvatarStyleModal';
 import { exportSite, type ExportDeploymentTarget } from '../services/export';
 import {
@@ -360,8 +361,6 @@ const resolveOverlaps = (blocks: BlockData[]): BlockData[] => {
 const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   // Load initial data from localStorage
   const [activeBento, setActiveBento] = useState<SavedBento | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [blocks, setBlocks] = useState<BlockData[]>([]);
   const [gridVersion, setGridVersion] = useState<number>(GRID_VERSION);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -373,6 +372,22 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const [pendingAvatarSrc, setPendingAvatarSrc] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [isLoading, setIsLoading] = useState(true);
+  const { 
+    state: siteData, 
+    set: setSiteData, 
+    undo, 
+    redo,
+    reset, 
+    canUndo, 
+    canRedo 
+  } = useHistory({
+    profile: null as any,
+    blocks: [] as any[]
+  });
+
+  const profile = siteData.profile;
+  const blocks = siteData.blocks;
+ 
 
   const [deployTarget, setDeployTarget] = useState<ExportDeploymentTarget>(() => {
     try {
@@ -460,9 +475,8 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
           ...bento,
           data: { ...bento.data, blocks: normalizedBlocks, gridVersion: nextGridVersion },
         });
-        setProfile(bento.data.profile);
+        reset({ profile: bento.data.profile, blocks: normalizedBlocks });
         setGridVersion(nextGridVersion);
-        setBlocks(normalizedBlocks);
         // Save migrated/normalized blocks if they changed
         if (normalizedBlocks !== bento.data.blocks || nextGridVersion !== bento.data.gridVersion) {
           updateBentoData(bento.id, {
@@ -506,28 +520,26 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   // Handle profile changes with auto-save
   const handleSetProfile = useCallback(
     (newProfile: UserProfile | ((prev: UserProfile) => UserProfile)) => {
-      setProfile((prev) => {
-        const updated = typeof newProfile === 'function' ? newProfile(prev!) : newProfile;
-        autoSave(updated, blocks);
-        return updated;
-      });
+      const updated = typeof newProfile === 'function' ? newProfile(profile!) : newProfile;
+      // Ενημερώνουμε το ενιαίο state (snapshot)
+      setSiteData({ profile: updated, blocks });
+      autoSave(updated, blocks);
     },
-    [blocks, autoSave]
+    [profile, blocks, setSiteData, autoSave]
   );
 
   // Handle blocks changes with auto-save - always resolve overlaps
   const handleSetBlocks = useCallback(
     (newBlocks: BlockData[] | ((prev: BlockData[]) => BlockData[])) => {
-      setBlocks((prev) => {
-        const updated = typeof newBlocks === 'function' ? newBlocks(prev) : newBlocks;
-        const normalized = ensureBlocksHavePositions(updated);
-        // Always resolve any overlaps to prevent blocks from stacking
-        const resolved = resolveOverlaps(normalized);
-        if (profile) autoSave(profile, resolved);
-        return resolved;
-      });
+      const updated = typeof newBlocks === 'function' ? newBlocks(blocks) : newBlocks;
+      const normalized = ensureBlocksHavePositions(updated);
+      const resolved = resolveOverlaps(normalized);
+      
+      // Ενημερώνουμε το ενιαίο state (snapshot)
+      setSiteData({ profile, blocks: resolved });
+      if (profile) autoSave(profile, resolved);
     },
-    [profile, autoSave]
+    [profile, blocks, setSiteData, autoSave]
   );
 
   // Note: Block positioning is handled when blocks are created (addBlock function)
@@ -554,8 +566,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         ...bento,
         data: { ...bento.data, blocks: normalizedBlocks, gridVersion: nextGridVersion },
       });
-      setProfile(bento.data.profile);
-      setBlocks(normalizedBlocks);
+      reset({ profile: bento.data.profile, blocks: normalizedBlocks });
       setEditingBlockId(null);
 
       if (normalizedBlocks !== bento.data.blocks || nextGridVersion !== bento.data.gridVersion) {
@@ -907,6 +918,34 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   }, []);
 
   useEffect(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    // Ignore undo/redo if the user is typing in an input or textarea
+    const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    if (isInput) return;
+
+    // Ctrl+Z or Cmd+Z
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+      if (e.shiftKey) {
+        redo(); // Ctrl + Shift + Z -> Redo
+      } else {
+        undo(); // Ctrl + Z -> Undo
+      }
+    } 
+    // Ctrl+Y (traditional Redo on Windows)
+    else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+      redo();
+    }
+  };
+
+  // Attach the keyboard listener
+  window.addEventListener('keydown', handleKeyDown);
+
+  // Cleanup listener when component unmounts
+  return () => window.removeEventListener('keydown', handleKeyDown);
+}, [undo, redo]);
+
+
+  useEffect(() => {
     if (!showAnalyticsModal) return;
     const url = profile?.analytics?.supabaseUrl?.trim() || '';
     const ref = url ? inferProjectRefFromSupabaseUrl(url) : '';
@@ -1230,6 +1269,8 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       </div>
     );
   }
+
+   if (!profile) return <div className="flex items-center justify-center h-screen">Loading...</div>;
 
   // Background style from profile settings
   const backgroundStyle: React.CSSProperties = profile.backgroundImage
