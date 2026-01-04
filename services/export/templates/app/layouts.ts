@@ -91,7 +91,7 @@ export const generateMobileLayout = (params: LayoutParams): string => `
                 const showCount = profile.showFollowerCount && acc.followerCount
                 return (
                   <a key={acc.platform} href={url} target="_blank" rel="noopener noreferrer"
-                    className={\`\${showCount ? 'px-3 py-2' : 'w-10 h-10'} bg-white rounded-full shadow-md flex items-center justify-center gap-2 hover:-translate-y-0.5 transition-all\`}
+                      className={\`\${showCount ? 'px-3 py-2' : 'w-10 h-10'} bg-white rounded-full shadow-md flex items-center justify-center gap-2 hover:-translate-y-0.5 transition-transform\`}
                     style={{ color: platform?.brandColor }}>
                     {Icon && <Icon size={20} />}
                     {showCount && (
