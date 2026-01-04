@@ -375,20 +375,19 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const [pendingAvatarSrc, setPendingAvatarSrc] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [isLoading, setIsLoading] = useState(true);
-  const { 
-    state: siteData, 
-    set: setSiteData, 
-    undo, 
+  const {
+    state: siteData,
+    set: setSiteData,
+    undo,
     redo,
-    reset 
+    reset,
   } = useHistory({
     profile: null as any,
-    blocks: [] as any[]
+    blocks: [] as any[],
   });
 
   const profile = siteData.profile;
   const blocks = siteData.blocks;
- 
 
   const [deployTarget, setDeployTarget] = useState<ExportDeploymentTarget>(() => {
     try {
@@ -534,7 +533,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       const updated = typeof newBlocks === 'function' ? newBlocks(blocks) : newBlocks;
       const normalized = ensureBlocksHavePositions(updated);
       const resolved = resolveOverlaps(normalized);
-      
+
       // Ενημερώνουμε το ενιαίο state (snapshot)
       setSiteData({ profile, blocks: resolved });
       if (profile) autoSave(profile, resolved);
@@ -992,32 +991,32 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   }, []);
 
   useEffect(() => {
-  const handleKeyDown = (e: KeyboardEvent) => {
-    // Ignore undo/redo if the user is typing in an input or textarea
-    const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
-    if (isInput) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore undo/redo if the user is typing in an input or textarea
+      const isInput =
+        e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      if (isInput) return;
 
-    // Ctrl+Z or Cmd+Z
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
-      if (e.shiftKey) {
-        redo(); // Ctrl + Shift + Z -> Redo
-      } else {
-        undo(); // Ctrl + Z -> Undo
+      // Ctrl+Z or Cmd+Z
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        if (e.shiftKey) {
+          redo(); // Ctrl + Shift + Z -> Redo
+        } else {
+          undo(); // Ctrl + Z -> Undo
+        }
       }
-    } 
-    // Ctrl+Y (traditional Redo on Windows)
-    else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
-      redo();
-    }
-  };
+      // Ctrl+Y (traditional Redo on Windows)
+      else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        redo();
+      }
+    };
 
-  // Attach the keyboard listener
-  window.addEventListener('keydown', handleKeyDown);
+    // Attach the keyboard listener
+    window.addEventListener('keydown', handleKeyDown);
 
-  // Cleanup listener when component unmounts
-  return () => window.removeEventListener('keydown', handleKeyDown);
-}, [undo, redo]);
-
+    // Cleanup listener when component unmounts
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   useEffect(() => {
     if (!showAnalyticsModal) return;
@@ -1344,7 +1343,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     );
   }
 
-   if (!profile) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  if (!profile) return <div className="flex items-center justify-center h-screen">Loading...</div>;
 
   // Background style from profile settings
   const backgroundStyle: React.CSSProperties = profile.backgroundImage
@@ -2144,22 +2143,22 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         closeEdit={closeSidebar}
       />
 
-     {/* 3. SETTINGS MODAL */}
-     <SettingsModal
-       isOpen={showSettingsModal}
-       onClose={() => setShowSettingsModal(false)}
-       profile={profile}
-       setProfile={handleSetProfile} 
-       bentoName={activeBento?.name}
-       onBentoNameChange={(name) => {
-         if (activeBento) {
-           setActiveBento({ ...activeBento, name });
-           renameBento(activeBento.id, name);
-         }
-      }}
-      blocks={blocks}
-      setBlocks={handleSetBlocks}
-     />
+      {/* 3. SETTINGS MODAL */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        profile={profile}
+        setProfile={handleSetProfile}
+        bentoName={activeBento?.name}
+        onBentoNameChange={(name) => {
+          if (activeBento) {
+            setActiveBento({ ...activeBento, name });
+            renameBento(activeBento.id, name);
+          }
+        }}
+        blocks={blocks}
+        setBlocks={handleSetBlocks}
+      />
 
       {/* 4. AVATAR CROP MODAL */}
       <ImageCropModal
