@@ -105,6 +105,7 @@ export interface UserProfile {
   avatarStyle?: AvatarStyle; // Profile picture style options
   theme: 'light' | 'dark';
   primaryColor: string;
+  publicSlug?: string;
   showBranding?: boolean;
   showSocialInHeader?: boolean; // Show social icons row under name/bio
   showFollowerCount?: boolean; // Show follower count next to social icons

@@ -33,6 +33,8 @@ type SettingsModalProps = {
   setProfile: (next: UserProfile | ((prev: UserProfile) => UserProfile)) => void;
   bentoName?: string;
   onBentoNameChange?: (name: string) => void;
+  onExportJson?: () => void;
+  onImportJson?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   // For raw JSON editing
   blocks?: BlockData[];
   onBlocksChange?: (blocks: BlockData[]) => void;
@@ -47,6 +49,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   setProfile,
   bentoName,
   onBentoNameChange,
+  onExportJson,
+  onImportJson,
   blocks,
   onBlocksChange,
 }) => {
@@ -327,6 +331,36 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* GENERAL TAB */}
               {activeTab === 'general' && (
                 <>
+                  <section className="space-y-3">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      JSON
+                    </h3>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        onClick={onExportJson}
+                        className="w-full sm:w-auto px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-black transition-colors disabled:opacity-50"
+                        disabled={!onExportJson}
+                      >
+                        Export as JSON
+                      </button>
+                      <label className="w-full sm:w-auto px-4 py-2 rounded-lg bg-white border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer text-center">
+                        Import JSON
+                        <input
+                          type="file"
+                          accept=".json,application/json"
+                          aria-label="Import JSON file"
+                          onChange={onImportJson}
+                          className="hidden"
+                          disabled={!onImportJson}
+                        />
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      Exporte ou importe un bento via JSON (usage avancé).
+                    </p>
+                  </section>
+
                   {/* Bento Name */}
                   {onBentoNameChange && (
                     <section className="space-y-3">
@@ -445,6 +479,34 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                       Branding
                     </h3>
+                    <div className="flex items-center justify-between gap-4 p-3 bg-white border border-gray-200 rounded-xl">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">Theme</p>
+                        <p className="text-xs text-gray-400">
+                          Switch between light and dark bento styles.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setProfile({
+                            ...profile,
+                            theme: profile.theme === 'dark' ? 'light' : 'dark',
+                          })
+                        }
+                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                          profile.theme === 'dark' ? 'bg-gray-900' : 'bg-gray-200'
+                        }`}
+                        aria-pressed={profile.theme === 'dark'}
+                        aria-label="Toggle dark theme"
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                            profile.theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
                     <div className="flex items-center justify-between gap-4 p-3 bg-white border border-gray-200 rounded-xl">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900">Show OpenBento credit</p>

@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build && node scripts/generate-doc-routes.mjs",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "build:vite": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
@@ -18,11 +19,13 @@
     "analytics:supabase:init": "node scripts/supabase-analytics-init.mjs"
   },
   "dependencies": {
+    "@next/mdx": "^15.1.0",
     "@mdx-js/rollup": "^3.1.1",
     "file-saver": "^2.0.5",
     "framer-motion": "^11.0.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.562.0",
+    "next": "^15.1.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-icons": "^5.5.0",
@@ -32,6 +35,8 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@types/node": "^22.14.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",

@@ -6,7 +6,7 @@ OpenBento can be customized through environment variables.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_ENABLE_LANDING` | Show landing page before builder | `false` |
+| `NEXT_PUBLIC_ENABLE_LANDING` | Show landing page before builder | `false` |
 
 ## Landing Page
 
@@ -17,13 +17,13 @@ To enable the landing page:
 **Development:**
 
 ```bash
-VITE_ENABLE_LANDING=true npm run dev
+NEXT_PUBLIC_ENABLE_LANDING=true npm run dev
 ```
 
 **Production build:**
 
 ```bash
-VITE_ENABLE_LANDING=true npm run build
+NEXT_PUBLIC_ENABLE_LANDING=true npm run build
 ```
 
 ## Data Storage

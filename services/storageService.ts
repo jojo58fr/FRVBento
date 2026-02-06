@@ -125,16 +125,17 @@ export const createBento = (name: string): SavedBento => {
     updatedAt: now,
     data: {
       gridVersion: GRID_VERSION,
-      profile: {
-        name: name || 'My Bento',
-        bio: 'Digital creator & developer.\nBuilding awesome things.',
-        avatarUrl: AVATAR_PLACEHOLDER,
-        theme: 'light' as const,
-        primaryColor: 'blue',
-        showBranding: true,
-        analytics: { enabled: false, supabaseUrl: '' },
-        socialAccounts: [],
-      },
+        profile: {
+          name: name || 'My Bento',
+          bio: 'Digital creator & developer.\nBuilding awesome things.',
+          avatarUrl: AVATAR_PLACEHOLDER,
+          theme: 'light' as const,
+          primaryColor: 'blue',
+          publicSlug: '',
+          showBranding: true,
+          analytics: { enabled: false, supabaseUrl: '' },
+          socialAccounts: [],
+        },
       blocks: [
         {
           id: generateId(),
@@ -313,16 +314,17 @@ export const importBentoFromJSON = (json: BentoJSON): SavedBento => {
     updatedAt: now,
     data: {
       gridVersion: json.gridVersion ?? GRID_VERSION,
-      profile: {
-        name: json.profile?.name || 'My Bento',
-        bio: json.profile?.bio || '',
-        avatarUrl: json.profile?.avatarUrl || AVATAR_PLACEHOLDER,
-        theme: json.profile?.theme || 'light',
-        primaryColor: json.profile?.primaryColor || 'blue',
-        showBranding: json.profile?.showBranding ?? true,
-        analytics: json.profile?.analytics || { enabled: false, supabaseUrl: '' },
-        socialAccounts: json.profile?.socialAccounts || [],
-      },
+        profile: {
+          name: json.profile?.name || 'My Bento',
+          bio: json.profile?.bio || '',
+          avatarUrl: json.profile?.avatarUrl || AVATAR_PLACEHOLDER,
+          theme: json.profile?.theme || 'light',
+          primaryColor: json.profile?.primaryColor || 'blue',
+          publicSlug: json.profile?.publicSlug || '',
+          showBranding: json.profile?.showBranding ?? true,
+          analytics: json.profile?.analytics || { enabled: false, supabaseUrl: '' },
+          socialAccounts: json.profile?.socialAccounts || [],
+        },
       blocks: (json.blocks || []).map((b) => ({
         ...b,
         id: generateId(), // Generate new IDs

@@ -1,7 +1,18 @@
-// Auto-import all markdown files at build time
-// This creates a static manifest - no runtime parsing needed
-
 import type { ComponentType } from 'react';
+import DocIndex from './index.md';
+import BuilderQuickStart from './builder/quick-start.md';
+import BuilderInstallation from './builder/installation.md';
+import BuilderConfiguration from './builder/configuration.md';
+import BuilderDeploy from './builder/deploy.md';
+import UsageQuickStart from './usage/quick-start.md';
+import UsageBlocks from './usage/blocks.md';
+import UsageAnalytics from './usage/analytics.md';
+import ExportQuickStart from './export/quick-start.md';
+import ExportOverview from './export/overview.md';
+import ExportVercel from './export/vercel.md';
+import ExportNetlify from './export/netlify.md';
+import ExportGithubPages from './export/github-pages.md';
+import ExportDocker from './export/docker.md';
 
 interface DocEntry {
   slug: string;
@@ -16,11 +27,6 @@ interface DocSection {
   icon: string;
   docs: DocEntry[];
 }
-
-// Eager loading: all MD files are transformed to React components at build time
-const modules = import.meta.glob<{ default: ComponentType }>('./**/*.md', {
-  eager: true,
-});
 
 // Section metadata
 const sectionMeta: Record<string, { title: string; icon: string; order: number }> = {
@@ -75,49 +81,41 @@ const slugToTitle = (slug: string): string => {
     .join(' ');
 };
 
-// Extract section from path
-const getSection = (path: string): string | undefined => {
-  const parts = path.replace('./', '').replace('.md', '').split('/');
-  if (parts.length > 1) {
-    return parts[0];
+// Build the flat manifest from static imports
+export const docsManifest: DocEntry[] = [
+  { slug: 'index', title: slugToTitle('index'), Component: DocIndex },
+  { slug: 'builder/quick-start', title: slugToTitle('builder/quick-start'), section: 'builder', Component: BuilderQuickStart },
+  { slug: 'builder/installation', title: slugToTitle('builder/installation'), section: 'builder', Component: BuilderInstallation },
+  { slug: 'builder/configuration', title: slugToTitle('builder/configuration'), section: 'builder', Component: BuilderConfiguration },
+  { slug: 'builder/deploy', title: slugToTitle('builder/deploy'), section: 'builder', Component: BuilderDeploy },
+  { slug: 'usage/quick-start', title: slugToTitle('usage/quick-start'), section: 'usage', Component: UsageQuickStart },
+  { slug: 'usage/blocks', title: slugToTitle('usage/blocks'), section: 'usage', Component: UsageBlocks },
+  { slug: 'usage/analytics', title: slugToTitle('usage/analytics'), section: 'usage', Component: UsageAnalytics },
+  { slug: 'export/quick-start', title: slugToTitle('export/quick-start'), section: 'export', Component: ExportQuickStart },
+  { slug: 'export/overview', title: slugToTitle('export/overview'), section: 'export', Component: ExportOverview },
+  { slug: 'export/vercel', title: slugToTitle('export/vercel'), section: 'export', Component: ExportVercel },
+  { slug: 'export/netlify', title: slugToTitle('export/netlify'), section: 'export', Component: ExportNetlify },
+  { slug: 'export/github-pages', title: slugToTitle('export/github-pages'), section: 'export', Component: ExportGithubPages },
+  { slug: 'export/docker', title: slugToTitle('export/docker'), section: 'export', Component: ExportDocker },
+].sort((a, b) => {
+  // Sort: index first, then by section order, then by doc order
+  if (a.slug === 'index') return -1;
+  if (b.slug === 'index') return 1;
+
+  const aSection = a.section || '';
+  const bSection = b.section || '';
+
+  if (aSection !== bSection) {
+    const aOrder = sectionMeta[aSection]?.order ?? 99;
+    const bOrder = sectionMeta[bSection]?.order ?? 99;
+    return aOrder - bOrder;
   }
-  return undefined;
-};
 
-// Build the flat manifest from glob imports
-export const docsManifest: DocEntry[] = Object.entries(modules)
-  .map(([path, mod]) => {
-    const slug = path
-      .replace('./', '')
-      .replace('.md', '')
-      .replace(/\/index$/, '');
-    const section = getSection(path);
-    return {
-      slug: slug || 'index',
-      title: slugToTitle(slug || 'index'),
-      section,
-      Component: mod.default,
-    };
-  })
-  .sort((a, b) => {
-    // Sort: index first, then by section order, then by doc order
-    if (a.slug === 'index') return -1;
-    if (b.slug === 'index') return 1;
-
-    const aSection = a.section || '';
-    const bSection = b.section || '';
-
-    if (aSection !== bSection) {
-      const aOrder = sectionMeta[aSection]?.order ?? 99;
-      const bOrder = sectionMeta[bSection]?.order ?? 99;
-      return aOrder - bOrder;
-    }
-
-    // Sort within section by docOrder
-    const aDocOrder = docOrder[a.slug] ?? 99;
-    const bDocOrder = docOrder[b.slug] ?? 99;
-    return aDocOrder - bDocOrder;
-  });
+  // Sort within section by docOrder
+  const aDocOrder = docOrder[a.slug] ?? 99;
+  const bDocOrder = docOrder[b.slug] ?? 99;
+  return aDocOrder - bDocOrder;
+});
 
 // Build sections for sidebar
 export const docsSections: DocSection[] = (() => {

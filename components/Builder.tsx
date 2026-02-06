@@ -46,6 +46,9 @@ import {
   Save,
   AlertCircle,
 } from 'lucide-react';
+
+const isDev = process.env.NODE_ENV === 'development';
+const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/$/, '');
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface BuilderProps {
@@ -370,6 +373,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showDeployModal, setShowDeployModal] = useState(false);
+  const [deployExpertMode, setDeployExpertMode] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAvatarCropModal, setShowAvatarCropModal] = useState(false);
@@ -391,6 +395,27 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
 
   const profile = siteData.profile;
   const blocks = siteData.blocks;
+  const isDark = profile?.theme === 'dark';
+  const headingText = isDark ? 'text-gray-100' : 'text-gray-900';
+  const bodyText = isDark ? 'text-gray-300' : 'text-gray-500';
+  const socialBg = isDark
+    ? 'bg-gray-900/80 border border-gray-800 text-gray-100'
+    : 'bg-white';
+  const socialCountText = isDark ? 'text-gray-200' : 'text-gray-700';
+  const nameHover = isDark ? 'hover:text-violet-300' : 'hover:text-violet-600';
+
+  const applyThemeToBlock = useCallback(
+    (block: BlockData): BlockData => {
+      if (block.customBackground || block.color) return block;
+      const textColor = block.textColor ?? (isDark ? 'text-gray-100' : 'text-gray-900');
+      return {
+        ...block,
+        color: isDark ? 'bg-gray-900' : 'bg-white',
+        textColor,
+      };
+    },
+    [isDark]
+  );
 
   const [deployTarget, setDeployTarget] = useState<ExportDeploymentTarget>(() => {
     try {
@@ -413,6 +438,13 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const [hasDownloadedExport, setHasDownloadedExport] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [publicSlug, setPublicSlug] = useState('');
+  const [publicSlugStatus, setPublicSlugStatus] = useState<
+    'idle' | 'checking' | 'available' | 'taken' | 'error'
+  >('idle');
+  const [publicSlugMessage, setPublicSlugMessage] = useState<string>('');
+  const [publicSlugLoading, setPublicSlugLoading] = useState(false);
+  const [showDeleteSlugConfirm, setShowDeleteSlugConfirm] = useState(false);
 
   const [analyticsDays, setAnalyticsDays] = useState<number>(30);
   const [analyticsAdminToken, setAnalyticsAdminToken] = useState<string>(() => {
@@ -771,6 +803,10 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const handleExport = () => {
     setHasDownloadedExport(false);
     setExportError(null);
+    setDeployExpertMode(false);
+    setPublicSlug(profile?.publicSlug || '');
+    setPublicSlugStatus('idle');
+    setPublicSlugMessage('');
     setShowDeployModal(true);
   };
 
@@ -784,6 +820,160 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     };
     downloadBentoJSON(currentBento);
   };
+
+  const buildCurrentBento = () => {
+    if (!activeBento) return null;
+    return {
+      ...activeBento,
+      data: { profile, blocks, gridVersion },
+    };
+  };
+
+  const normalizeSlug = (value: string) =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]/g, '')
+      .replace(/-{2,}/g, '-')
+      .replace(/^[-_]+|[-_]+$/g, '');
+
+  const checkPublicSlug = async (slug: string) => {
+    const clean = normalizeSlug(slug);
+    if (!clean) {
+      setPublicSlugStatus('error');
+      setPublicSlugMessage('Please enter a valid slug.');
+      return;
+    }
+    setPublicSlugStatus('checking');
+    setPublicSlugMessage('Checking availability…');
+    try {
+      const res = await fetch(`/api/bento/${encodeURIComponent(clean)}`);
+      if (res.ok) {
+        setPublicSlugStatus('taken');
+        setPublicSlugMessage('This URL is already registered.');
+        return;
+      }
+      if (res.status === 404) {
+        setPublicSlugStatus('available');
+        setPublicSlugMessage('This URL is available.');
+        return;
+      }
+      setPublicSlugStatus('error');
+      setPublicSlugMessage('Failed to check URL.');
+    } catch {
+      setPublicSlugStatus('error');
+      setPublicSlugMessage('Network error while checking URL.');
+    }
+  };
+
+  const savePublicSlug = async () => {
+    const current = buildCurrentBento();
+    if (!current) return;
+    const clean = normalizeSlug(publicSlug);
+    if (!clean) {
+      setPublicSlugStatus('error');
+      setPublicSlugMessage('Please enter a valid slug.');
+      return;
+    }
+    setPublicSlugLoading(true);
+    try {
+      const exists = await fetch(`/api/bento/${encodeURIComponent(clean)}`);
+      if (exists.ok) {
+        setPublicSlugStatus('taken');
+        setPublicSlugMessage('This URL is already registered.');
+        return;
+      }
+      const res = await fetch('/api/bento', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: clean, bento: current }),
+      });
+      if (!res.ok) {
+        setPublicSlugStatus('error');
+        setPublicSlugMessage('Failed to save URL.');
+        return;
+      }
+      setPublicSlugStatus('available');
+      setPublicSlugMessage(`Saved: bento.frvtubers.com/${clean}`);
+      handleSetProfile((prev) => ({ ...prev, publicSlug: clean }));
+    } catch {
+      setPublicSlugStatus('error');
+      setPublicSlugMessage('Network error while saving URL.');
+    } finally {
+      setPublicSlugLoading(false);
+    }
+  };
+
+  const updatePublicSlug = async () => {
+    const current = buildCurrentBento();
+    if (!current) return;
+    const clean = normalizeSlug(publicSlug);
+    if (!clean) {
+      setPublicSlugStatus('error');
+      setPublicSlugMessage('Please enter a valid slug.');
+      return;
+    }
+    setPublicSlugLoading(true);
+    try {
+      const res = await fetch(`/api/bento/${encodeURIComponent(clean)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bento: current }),
+      });
+      if (!res.ok) {
+        setPublicSlugStatus('error');
+        setPublicSlugMessage('Failed to update URL.');
+        return;
+      }
+      setPublicSlugStatus('available');
+      setPublicSlugMessage(`Updated: bento.frvtubers.com/${clean}`);
+      handleSetProfile((prev) => ({ ...prev, publicSlug: clean }));
+    } catch {
+      setPublicSlugStatus('error');
+      setPublicSlugMessage('Network error while updating URL.');
+    } finally {
+      setPublicSlugLoading(false);
+    }
+  };
+
+  const deletePublicSlug = async () => {
+    const clean = normalizeSlug(publicSlug);
+    if (!clean) return;
+    setPublicSlugLoading(true);
+    try {
+      const res = await fetch(`/api/bento/${encodeURIComponent(clean)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setPublicSlugStatus('error');
+        setPublicSlugMessage('Failed to delete URL.');
+        return;
+      }
+      setPublicSlugStatus('idle');
+      setPublicSlugMessage('URL removed from server.');
+      handleSetProfile((prev) => ({ ...prev, publicSlug: '' }));
+    } catch {
+      setPublicSlugStatus('error');
+      setPublicSlugMessage('Network error while deleting URL.');
+    } finally {
+      setPublicSlugLoading(false);
+    }
+  };
+
+  const normalizedPublicSlug = normalizeSlug(publicSlug);
+  const canSavePublicSlug =
+    !publicSlugLoading &&
+    !!normalizedPublicSlug &&
+    publicSlugStatus !== 'taken' &&
+    publicSlugStatus !== 'checking';
+  const canUpdatePublicSlug =
+    !publicSlugLoading &&
+    !!normalizedPublicSlug &&
+    (publicSlugStatus === 'taken' ||
+      normalizedPublicSlug === normalizeSlug(profile?.publicSlug || ''));
+  const canDeletePublicSlug =
+    !publicSlugLoading &&
+    !!normalizedPublicSlug &&
+    (publicSlugStatus === 'taken' ||
+      normalizedPublicSlug === normalizeSlug(profile?.publicSlug || ''));
 
   // Import bento from JSON file
   const handleImportJSON = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1057,7 +1247,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   }, [inferProjectRefFromSupabaseUrl, profile?.analytics?.supabaseUrl, showAnalyticsModal]);
 
   const runSupabaseSetup = useCallback(async () => {
-    if (!import.meta.env.DEV) return;
+    if (!isDev) return;
     if (!profile) return;
 
     setSupabaseSetupRunning(true);
@@ -1121,7 +1311,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   ]);
 
   const checkSupabaseStatus = useCallback(async () => {
-    if (!import.meta.env.DEV) return;
+    if (!isDev) return;
     if (!profile) return;
 
     setSupabaseSetupRunning(true);
@@ -1386,7 +1576,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       }
     : profile.backgroundColor
       ? { backgroundColor: profile.backgroundColor }
-      : { backgroundColor: '#f9fafb' }; // default gray-50
+      : { backgroundColor: isDark ? '#0b0b0f' : '#f9fafb' }; // default
 
   return (
     <div className="min-h-screen flex font-sans overflow-x-hidden relative" style={backgroundStyle}>
@@ -1446,12 +1636,12 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                       transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                       className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full"
                     />
-                    <span className="text-gray-600">Saving...</span>
+                    <span className="text-gray-600">Saving…</span>
                   </>
                 ) : saveStatus === 'saved' ? (
                   <>
                     <Check size={16} className="text-green-500" />
-                    <span className="text-green-600">Saved!</span>
+                    <span className="text-green-600">Saved local</span>
                   </>
                 ) : saveStatus === 'error' ? (
                   <>
@@ -1465,6 +1655,15 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                   </>
                 )}
               </button>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium">
+                <Globe
+                  size={16}
+                  className={profile.publicSlug ? 'text-emerald-600' : 'text-red-600'}
+                />
+                <span className={profile.publicSlug ? 'text-emerald-600' : 'text-red-600'}>
+                  {profile.publicSlug ? 'Published' : 'Not published'}
+                </span>
+              </div>
               <div className="h-6 w-px bg-gray-200 mx-1"></div>
               <div className="flex bg-gray-100/80 p-1 rounded-xl gap-0.5">
                 <button
@@ -1511,12 +1710,12 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                 <span className="hidden sm:inline">Settings</span>
               </button>
 
-              {import.meta.env.DEV && (
+              {isDev && (
                 <button
                   type="button"
                   aria-label="Open preview page in new tab"
                   onClick={() => {
-                    const previewPath = `${import.meta.env.BASE_URL}preview`;
+                    const previewPath = `${basePath}/preview`;
                     window.open(previewPath, '_blank', 'noopener,noreferrer');
                   }}
                   className="bg-white px-3.5 py-2 rounded-lg shadow-sm border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1527,7 +1726,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                 </button>
               )}
 
-              {(import.meta.env.DEV || profile?.analytics?.enabled) && (
+              {(isDev || profile?.analytics?.enabled) && (
                 <a
                   href="/analytics"
                   aria-label="View analytics dashboard"
@@ -1540,41 +1739,14 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
               )}
 
               {/* AI Generator */}
-              <button
+              {/* <button
                 onClick={() => setShowAIGeneratorModal(true)}
                 className="bg-gradient-to-r from-violet-500 to-purple-600 text-white px-3.5 py-2 rounded-lg shadow-sm hover:from-violet-600 hover:to-purple-700 transition-all text-xs font-semibold flex items-center gap-2"
                 title="Generate with AI"
               >
                 <Sparkles size={16} />
                 <span className="hidden sm:inline">AI</span>
-              </button>
-
-              {/* JSON Import/Export */}
-              <div className="flex items-center gap-1 border-r border-gray-200 pr-3 mr-1">
-                <button
-                  type="button"
-                  aria-label="Export as JSON"
-                  onClick={handleExportJSON}
-                  className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title="Export as JSON"
-                >
-                  <FileDown size={16} />
-                </button>
-                <label
-                  aria-label="Import JSON file"
-                  className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer focus-within:ring-2 focus-within:ring-blue-500"
-                  title="Import JSON"
-                >
-                  <Upload size={16} />
-                  <input
-                    type="file"
-                    accept=".json,application/json"
-                    aria-label="Import JSON file"
-                    onChange={handleImportJSON}
-                    className="hidden"
-                  />
-                </label>
-              </div>
+              </button> */}
 
               <button
                 type="button"
@@ -1666,7 +1838,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                     onChange={(e) => setTempName(e.target.value)}
                     onBlur={saveNameEdit}
                     onKeyDown={handleNameKeyDown}
-                    className="text-4xl font-bold tracking-tight text-gray-900 bg-transparent border-b-2 border-violet-500 outline-none w-full leading-[1.1]"
+                    className={`text-4xl font-bold tracking-tight bg-transparent border-b-2 border-violet-500 outline-none w-full leading-[1.1] ${headingText}`}
                     placeholder="Your name"
                   />
                 ) : (
@@ -1674,7 +1846,9 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                     className="group cursor-pointer flex items-center gap-2"
                     onClick={startEditingName}
                   >
-                    <h1 className="text-4xl font-bold tracking-tight text-gray-900 group-hover:text-violet-600 transition-colors leading-[1.1]">
+                    <h1
+                      className={`text-4xl font-bold tracking-tight transition-colors leading-[1.1] ${headingText} ${nameHover}`}
+                    >
                       {profile.name}
                     </h1>
                     <Pencil
@@ -1693,13 +1867,13 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                     onChange={(e) => setTempBio(e.target.value)}
                     onBlur={saveBioEdit}
                     onKeyDown={handleBioKeyDown}
-                    className="text-base text-gray-600 font-medium leading-relaxed bg-transparent border-b-2 border-violet-500 outline-none w-full resize-none"
+                    className={`text-base font-medium leading-relaxed bg-transparent border-b-2 border-violet-500 outline-none w-full resize-none ${bodyText}`}
                     rows={3}
                     placeholder="Write something about yourself..."
                   />
                 ) : (
                   <p
-                    className="group text-base text-gray-500 font-medium leading-relaxed whitespace-pre-wrap cursor-pointer hover:text-gray-700 transition-colors flex items-start gap-2"
+                    className={`group text-base font-medium leading-relaxed whitespace-pre-wrap cursor-pointer transition-colors flex items-start gap-2 ${bodyText} ${isDark ? 'hover:text-gray-200' : 'hover:text-gray-700'}`}
                     onClick={startEditingBio}
                   >
                     <span className="flex-1">{profile.bio || 'Click to add bio...'}</span>
@@ -1728,7 +1902,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                             href={url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={`${showCount ? 'px-3 py-2 rounded-full' : 'w-10 h-10 rounded-full'} bg-white shadow-md flex items-center justify-center gap-2 hover:scale-105 hover:shadow-lg transition-all`}
+                            className={`${showCount ? 'px-3 py-2 rounded-full' : 'w-10 h-10 rounded-full'} ${socialBg} shadow-md flex items-center justify-center gap-2 hover:scale-105 hover:shadow-lg transition-all`}
                             title={option.label}
                           >
                             {BrandIcon ? (
@@ -1736,12 +1910,12 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                 <BrandIcon size={20} />
                               </span>
                             ) : (
-                              <span className="text-gray-600">
+                              <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>
                                 <FallbackIcon size={20} />
                               </span>
                             )}
                             {showCount && (
-                              <span className="text-sm font-semibold text-gray-700">
+                              <span className={`text-sm font-semibold ${socialCountText}`}>
                                 {formatFollowerCount(account.followerCount)}
                               </span>
                             )}
@@ -1804,7 +1978,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                       }
-                    : { background: profile.backgroundColor || '#f8fafc' };
+                    : { background: profile.backgroundColor || (isDark ? '#0b0b0f' : '#f8fafc') };
 
                   return (
                     <div className="mockup-phone border-gray-800 border-[14px] rounded-[3rem] h-[800px] w-[375px] shadow-2xl bg-white overflow-hidden relative">
@@ -1841,10 +2015,14 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                               className="w-full h-full object-cover"
                             />
                           </div>
-                          <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 leading-none mb-2">
+                          <h1
+                            className={`text-2xl font-extrabold tracking-tight leading-none mb-2 ${headingText}`}
+                          >
                             {profile.name}
                           </h1>
-                          <p className="text-sm text-gray-500 font-medium whitespace-pre-wrap max-w-xs leading-relaxed">
+                          <p
+                            className={`text-sm font-medium whitespace-pre-wrap max-w-xs leading-relaxed ${bodyText}`}
+                          >
                             {profile.bio}
                           </p>
                           {/* Social icons row - Matches export's .profile-socials */}
@@ -1866,7 +2044,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                       href={url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className={`${showCount ? 'px-3 py-2' : 'w-10 h-10'} bg-white rounded-full shadow-md flex items-center justify-center gap-2 font-semibold text-gray-900 transition-transform hover:-translate-y-0.5`}
+                                      className={`${showCount ? 'px-3 py-2' : 'w-10 h-10'} ${socialBg} rounded-full shadow-md flex items-center justify-center gap-2 font-semibold transition-transform hover:-translate-y-0.5`}
                                       title={option.label}
                                     >
                                       {BrandIcon ? (
@@ -1874,12 +2052,12 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                           <BrandIcon size={20} />
                                         </span>
                                       ) : (
-                                        <span className="text-gray-600">
+                                        <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>
                                           <FallbackIcon size={20} />
                                         </span>
                                       )}
                                       {showCount && (
-                                        <span className="text-sm font-semibold text-gray-900">
+                                        <span className={`text-sm font-semibold ${socialCountText}`}>
                                           {formatFollowerCount(account.followerCount)}
                                         </span>
                                       )}
@@ -1912,7 +2090,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                   }}
                                 >
                                   <Block
-                                    block={block}
+                                    block={applyThemeToBlock(block)}
                                     isSelected={false}
                                     onEdit={() => {}}
                                     onDelete={() => {}}
@@ -2087,7 +2265,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                           {finalBlocks.map((block, index) => (
                             <Block
                               key={block.id}
-                              block={{ ...block, zIndex: index + 1 }}
+                              block={{ ...applyThemeToBlock(block), zIndex: index + 1 }}
                               isSelected={editingBlockId === block.id}
                               isDragTarget={dragOverBlockId === block.id}
                               isDragging={draggedBlockId === block.id}
@@ -2228,6 +2406,8 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
             renameBento(activeBento.id, name);
           }
         }}
+        onExportJson={handleExportJSON}
+        onImportJson={handleImportJSON}
         blocks={blocks}
         setBlocks={handleSetBlocks}
       />
@@ -2300,7 +2480,8 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                   </div>
                   <h2 className="text-xl font-bold text-gray-900">Deploy</h2>
                   <p className="text-gray-500 mt-1 text-sm">
-                    Download the package, then follow <code>DEPLOY.md</code> inside.
+                    Publie ton bento sur l&apos;URL FRVBento. Le déploiement local est réservé au
+                    mode expert.
                   </p>
                 </div>
                 <button
@@ -2312,83 +2493,220 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
               </div>
 
               <div className="px-6 space-y-4 pb-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 space-y-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                      Deployment target
-                    </label>
-                    <select
-                      value={deployTarget}
-                      onChange={(e) => {
-                        setDeployTarget(e.target.value as ExportDeploymentTarget);
-                        setHasDownloadedExport(false);
-                        setExportError(null);
-                      }}
-                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-black/5 focus:border-black focus:outline-none transition-all font-semibold text-gray-800"
-                    >
-                      <option value="vercel">Vercel</option>
-                      <option value="netlify">Netlify</option>
-                      <option value="docker">Docker (nginx)</option>
-                      <option value="vps">VPS (nginx)</option>
-                      <option value="heroku">Heroku</option>
-                      <option value="github-pages">GitHub Pages</option>
-                    </select>
+                <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl p-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Mode expert</p>
+                    <p className="text-xs text-gray-500">
+                      Affiche les options de déploiement local.
+                    </p>
                   </div>
-
-                  <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 flex gap-3 items-center">
-                    <div className="bg-white p-2 rounded-full shadow-sm border border-gray-100 text-gray-700">
-                      {isExporting ? (
-                        <RefreshCw size={20} className="animate-spin" />
-                      ) : hasDownloadedExport ? (
-                        <Check size={20} className="text-green-600" />
-                      ) : (
-                        <Download size={20} />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 text-sm leading-tight">
-                        {isExporting
-                          ? 'Packaging…'
-                          : hasDownloadedExport
-                            ? 'Package downloaded'
-                            : 'Download package'}
-                      </p>
-                      <p className="text-gray-500 text-xs break-all">
-                        <code>{`${profile.name.replace(/\s+/g, '-').toLowerCase()}-bento-${deployTarget}.zip`}</code>
-                      </p>
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeployExpertMode((prev) => !prev)}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                      deployExpertMode ? 'bg-gray-900' : 'bg-gray-200'
+                    }`}
+                    aria-pressed={deployExpertMode}
+                    aria-label="Toggle expert mode"
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                        deployExpertMode ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
                 </div>
 
-                {exportError && (
-                  <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-sm text-red-700 font-semibold">
-                    {exportError}
+                {!deployExpertMode ? (
+                  <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        URL publique
+                      </label>
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-600">
+                          bento.frvtubers.com/
+                        </div>
+                        <input
+                          type="text"
+                          value={publicSlug}
+                          onChange={(e) => {
+                            setPublicSlug(e.target.value);
+                            setPublicSlugStatus('idle');
+                            setPublicSlugMessage('');
+                          }}
+                          onBlur={() => {
+                            if (publicSlug.trim()) void checkPublicSlug(publicSlug);
+                          }}
+                          placeholder="tonpseudo"
+                          className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                        />
+                      </div>
+                      {publicSlugMessage && (
+                        <p
+                          className={`mt-2 text-xs ${
+                            publicSlugStatus === 'error'
+                              ? 'text-red-600'
+                              : publicSlugStatus === 'taken'
+                                ? 'text-amber-600'
+                                : 'text-emerald-600'
+                          }`}
+                        >
+                          {publicSlugMessage}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        onClick={() => checkPublicSlug(publicSlug)}
+                        disabled={!publicSlug.trim() || publicSlugStatus === 'checking'}
+                        className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {publicSlugStatus === 'checking' ? 'Checking…' : 'Vérifier'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={savePublicSlug}
+                        disabled={!canSavePublicSlug}
+                        className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-50"
+                      >
+                        Associer l&apos;URL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={updatePublicSlug}
+                        disabled={!canUpdatePublicSlug}
+                        className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50"
+                      >
+                        Modifier l&apos;URL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteSlugConfirm(true)}
+                        disabled={!canDeletePublicSlug}
+                        className="px-4 py-2 rounded-lg bg-red-100 text-red-700 text-sm font-semibold hover:bg-red-200 disabled:opacity-50"
+                      >
+                        Supprimer
+                      </button>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                          Deployment target
+                        </label>
+                        <select
+                          value={deployTarget}
+                          onChange={(e) => {
+                            setDeployTarget(e.target.value as ExportDeploymentTarget);
+                            setHasDownloadedExport(false);
+                            setExportError(null);
+                          }}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-black/5 focus:border-black focus:outline-none transition-all font-semibold text-gray-800"
+                        >
+                          <option value="vercel">Vercel</option>
+                          <option value="netlify">Netlify</option>
+                          <option value="docker">Docker (nginx)</option>
+                          <option value="vps">VPS (nginx)</option>
+                          <option value="heroku">Heroku</option>
+                          <option value="github-pages">GitHub Pages</option>
+                        </select>
+                      </div>
+
+                      <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 flex gap-3 items-center">
+                        <div className="bg-white p-2 rounded-full shadow-sm border border-gray-100 text-gray-700">
+                          {isExporting ? (
+                            <RefreshCw size={20} className="animate-spin" />
+                          ) : hasDownloadedExport ? (
+                            <Check size={20} className="text-green-600" />
+                          ) : (
+                            <Download size={20} />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm leading-tight">
+                            {isExporting
+                              ? 'Packaging…'
+                              : hasDownloadedExport
+                                ? 'Package downloaded'
+                                : 'Download package'}
+                          </p>
+                          <p className="text-gray-500 text-xs break-all">
+                            <code>{`${profile.name.replace(/\s+/g, '-').toLowerCase()}-bento-${deployTarget}.zip`}</code>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {exportError && (
+                      <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-sm text-red-700 font-semibold">
+                        {exportError}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               <div className="p-6 pt-4 border-t border-gray-100">
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={downloadExport}
-                    disabled={isExporting}
-                    className="w-full sm:flex-1 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isExporting ? (
-                      <RefreshCw size={16} className="animate-spin" />
-                    ) : (
-                      <Download size={16} />
-                    )}
-                    {hasDownloadedExport ? 'Download again' : 'Download package'}
-                  </button>
+                  {deployExpertMode && (
+                    <button
+                      onClick={downloadExport}
+                      disabled={isExporting}
+                      className="w-full sm:flex-1 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isExporting ? (
+                        <RefreshCw size={16} className="animate-spin" />
+                      ) : (
+                        <Download size={16} />
+                      )}
+                      {hasDownloadedExport ? 'Download again' : 'Download package'}
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowDeployModal(false)}
-                    className="w-full sm:flex-1 py-3 bg-white text-gray-900 rounded-xl font-bold border border-gray-200 hover:bg-gray-50 transition-colors"
+                    className={`w-full ${deployExpertMode ? 'sm:flex-1' : ''} py-3 bg-white text-gray-900 rounded-xl font-bold border border-gray-200 hover:bg-gray-50 transition-colors`}
                   >
                     Close
                   </button>
                 </div>
               </div>
+
+              {/* Confirm Delete Popup */}
+              {showDeleteSlugConfirm && (
+                <div className="absolute inset-0 z-10 bg-black/40 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-sm w-full p-5">
+                    <h3 className="text-lg font-bold text-gray-900">Supprimer l&apos;URL ?</h3>
+                    <p className="text-sm text-gray-600 mt-2">
+                      Attention, on aura plus le bento sur le serveur. Il ne sera qu&apos;en local,
+                      attention à ne pas le perdre.
+                    </p>
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteSlugConfirm(false)}
+                        className="flex-1 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 font-semibold hover:bg-gray-50"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setShowDeleteSlugConfirm(false);
+                          await deletePublicSlug();
+                        }}
+                        className="flex-1 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700"
+                      >
+                        Confirmer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -2483,7 +2801,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                       className="flex-1 bg-white border border-gray-200 rounded-xl p-2.5 focus:ring-2 focus:ring-black/5 focus:border-black focus:outline-none transition-all font-medium text-gray-700"
                       placeholder="https://xxxx.supabase.co"
                     />
-                    {import.meta.env.DEV && (
+                    {isDev && (
                       <button
                         type="button"
                         aria-label={
@@ -2497,7 +2815,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                     )}
                   </div>
 
-                  {import.meta.env.DEV && supabaseSetupOpen && (
+                  {isDev && supabaseSetupOpen && (
                     <div className="pt-2 space-y-3">
                       <div className="flex flex-wrap gap-2">
                         <button

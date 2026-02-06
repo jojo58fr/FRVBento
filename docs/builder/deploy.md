@@ -59,7 +59,7 @@ Since the builder is a static site, you can host it anywhere:
 1. Fork the [OpenBento repository](https://github.com/yoanbernabeu/openbento)
 2. Import in [Vercel Dashboard](https://vercel.com/new)
 3. Vercel auto-detects Vite configuration
-4. Optionally set `VITE_ENABLE_LANDING=true` in environment variables
+4. Optionally set `NEXT_PUBLIC_ENABLE_LANDING=true` in environment variables
 
 ### Netlify
 
@@ -125,7 +125,7 @@ When deploying with landing page enabled:
 
 | Platform | How to set |
 |----------|------------|
-| Docker | `-e VITE_ENABLE_LANDING=true` at build time |
+| Docker | `-e NEXT_PUBLIC_ENABLE_LANDING=true` at build time |
 | Vercel | Project Settings → Environment Variables |
 | Netlify | Site Settings → Environment Variables |
 

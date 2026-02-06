@@ -1,21 +1,20 @@
 import React, { useMemo, useState } from 'react';
+import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Github, Menu, X } from 'lucide-react';
 import { docsManifest, docsSections, getDocBySlug, getIndexDoc } from '../../docs/manifest';
 import DocsSidebar from './DocsSidebar';
 import DocsSearch from './DocsSearch';
-import './docsStyles.css';
 
 // Disable browser scroll restoration for docs navigation
 if (typeof window !== 'undefined' && 'scrollRestoration' in history) {
   history.scrollRestoration = 'manual';
 }
 
-// Get current doc slug from URL
-function getDocSlug(): string {
-  const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-  const pathname = window.location.pathname;
-  const withoutBase = base && pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
+const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/$/, '');
+
+const getDocSlugFromPath = (pathname: string): string => {
+  const withoutBase = basePath && pathname.startsWith(basePath) ? pathname.slice(basePath.length) : pathname;
   const route = (withoutBase || '/').replace(/\/$/, '') || '/';
 
   // Extract slug from /doc or /doc/section/page
@@ -24,10 +23,19 @@ function getDocSlug(): string {
     return match[1] || 'index';
   }
   return 'index';
-}
+};
 
 const DocsPage: React.FC = () => {
-  const slug = getDocSlug();
+  const router = useRouter();
+  const slug = useMemo(() => {
+    const param = router.query.slug;
+    if (Array.isArray(param)) return param.join('/');
+    if (typeof param === 'string') return param;
+    if (typeof router.asPath === 'string') {
+      return getDocSlugFromPath(router.asPath.split('?')[0]);
+    }
+    return 'index';
+  }, [router.query.slug, router.asPath]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const currentDoc = useMemo(() => {
@@ -35,12 +43,12 @@ const DocsPage: React.FC = () => {
   }, [slug]);
 
   const navigateToDoc = (newSlug: string) => {
-    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
     const path = newSlug === 'index' ? '/doc' : `/doc/${newSlug}`;
-    window.history.pushState({}, '', base + path);
-    window.scrollTo(0, 0);
+    void router.push(`${basePath}${path}`);
+    if (typeof window !== 'undefined') {
+      window.scrollTo(0, 0);
+    }
     setSidebarOpen(false);
-    window.location.reload();
   };
 
   // Find prev/next docs
@@ -59,7 +67,7 @@ const DocsPage: React.FC = () => {
           {/* Logo section - aligned with sidebar */}
           <div className="w-64 flex-shrink-0 px-4 py-3 hidden lg:flex items-center gap-3">
             <a
-              href={import.meta.env.BASE_URL || '/'}
+              href={basePath || '/'}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 hover:opacity-80 transition-opacity"
@@ -82,7 +90,7 @@ const DocsPage: React.FC = () => {
               <Menu size={20} />
             </button>
             <a
-              href={import.meta.env.BASE_URL || '/'}
+              href={basePath || '/'}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
