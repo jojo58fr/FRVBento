@@ -1,177 +1,128 @@
-# OpenBento
+# Bento for VTubers
+*(Fork of OpenBento)*
 
-**A beautiful, open-source bento grid generator for creating stunning link-in-bio pages**
+**Bento for VTubers** est un fork open-source de **OpenBento**, un générateur de pages *link-in-bio* moderne basé sur une grille bento.
 
-[![Deploy to GitHub Pages](https://github.com/yoanbernabeu/openbento/actions/workflows/deploy.yml/badge.svg)](https://github.com/yoanbernabeu/openbento/actions/workflows/deploy.yml)
-[![Docker Build & Publish](https://github.com/yoanbernabeu/openbento/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/yoanbernabeu/openbento/actions/workflows/docker-publish.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker Pulls](https://img.shields.io/docker/pulls/yoanbernabeu/openbento)](https://hub.docker.com/r/yoanbernabeu/openbento)
+Ce fork a pour objectif d’étendre OpenBento afin de proposer une **solution dédiée aux VTubers**, incluant **l’hébergement des pages bento via une URL publique**, tout en restant fidèle aux valeurs open-source, à la portabilité et à la philosophie *privacy-first* du projet original.
 
-[Live Demo](https://yoanbernabeu.github.io/openbento/) • [Report Bug](https://github.com/yoanbernabeu/openbento/issues) • [Request Feature](https://github.com/yoanbernabeu/openbento/issues)
-
----
-
-## ✨ Features
-
-### 🧱 Block Types (7 types)
-
-- 🔗 **Links** - Clickable links with titles & subtitles
-- 🖼️ **Media** - Images & GIFs with position control
-- 📺 **YouTube** - Single video, grid, or list mode
-- 📝 **Text** - Notes, quotes, and bio sections
-- 🌐 **Social** - 26+ platforms with branded colors
-- 📍 **Map** - Interactive Google Maps embed
-- ⬜ **Spacer** - Empty blocks for layout control
-
-### 🎨 Core Features
-
-- 🖱️ **Visual Drag & Drop** - Intuitive 9×9 grid editor. Drag, resize, and position blocks freely with real-time preview
-- 🎭 **Full Customization** - Colors, gradients, custom backgrounds. Avatars with borders, shadows & multiple shapes
-- 📦 **Export to React** - Download a complete Vite + React + TypeScript + Tailwind project, ready to deploy
-- 🚀 **Multi-Platform Deploy** - Auto-generated configs for Vercel, Netlify, GitHub Pages, Docker, VPS & Heroku
-- 🔒 **Privacy First** - No tracking, no account, no server required. All data stays in your browser localStorage
-- 📁 **Multiple Bentos** - Save and manage multiple projects locally. Switch between them instantly
-
-### 📊 Optional Analytics
-
-Track visits with your own Supabase instance:
-- Page views & unique visitors
-- Referrer tracking
-- Self-hosted on your Supabase project
-- No third-party cookies or trackers
-- Admin dashboard included
-
-See [ANALYTICS.md](ANALYTICS.md) for setup instructions.
-
-### 🌐 26+ Social Platforms Supported
-
-X (Twitter), Instagram, TikTok, YouTube, GitHub, GitLab, LinkedIn, Facebook, Twitch, Dribbble, Medium, Dev.to, Reddit, Pinterest, Threads, Bluesky, Mastodon, Substack, Patreon, Ko-fi, Buy Me a Coffee, Snapchat, Discord, Telegram, WhatsApp, and custom links.
-
-### 🛠️ Tech Stack (Exported Project)
-
-Your exported project includes: **React**, **Vite**, **TypeScript**, **Tailwind CSS**, **Lucide Icons**, **React Icons**
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) (v18 or higher)
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yoanbernabeu/openbento.git
-   cd openbento
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
-
-### Landing Page (Optional)
-
-By default, the app opens directly on the builder (no landing page) to make self-hosting easier.
-
-To enable the landing page:
-```bash
-VITE_ENABLE_LANDING=true npm run dev
-```
-
-For production builds:
-```bash
-VITE_ENABLE_LANDING=true npm run build
-```
-
-### Build for Production
-
-```bash
-npm run build
-```
-
-The built files will be in the `dist` directory.
-
-## 🐳 Using Docker
-
-OpenBento is available as a multi-platform Docker image supporting both AMD64 and ARM64 architectures (Intel/AMD servers, Mac M1/M2/M3, ARM servers, Raspberry Pi 4+).
-
-### Quick Start with Docker
-
-Pull and run the latest image:
-
-```bash
-docker run -d -p 8080:80 yoanbernabeu/openbento:latest
-```
-
-Then open [http://localhost:8080](http://localhost:8080) in your browser.
-
-### Multi-Platform Support
-
-The Docker image supports multiple architectures:
-- **linux/amd64** - Intel/AMD 64-bit (standard servers, PCs)
-- **linux/arm64** - ARM 64-bit (Mac M1/M2/M3, AWS Graviton, Raspberry Pi 4+)
-
-Docker automatically selects the correct image for your architecture.
-
-### Building Your Own Image
-
-```bash
-# Build for your current platform
-docker build -t openbento .
-
-# Build for multiple platforms
-docker buildx build --platform linux/amd64,linux/arm64 -t openbento .
-```
-
-### Docker Compose
-
-Create a `compose.yml`:
-
-```yaml
-services:
-  openbento:
-    image: yoanbernabeu/openbento:latest
-    ports:
-      - "8080:80"
-    restart: unless-stopped
-```
-
-Run with:
-
-```bash
-docker compose up -d
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting a pull request.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 👥 Authors
-
-**Yoan Bernabeu**
-
-- GitHub: [@yoanbernabeu](https://github.com/yoanbernabeu)
-- Twitter: [@yOyO38](https://twitter.com/yOyO38)
-
-**Anis AYARI**
-
-- GitHub: [@anisayari](https://github.com/anisayari)
-- X: [@DFintelligence](https://x.com/DFintelligence)
+Exemple d’URL publique :  
+https://bento.frvtubers.com/username
 
 ---
 
-<div align="center">
-Made with ❤️ by the open-source community
-</div>
+## 🎯 Pourquoi ce fork ?
+
+OpenBento est conçu comme un **builder local avec export**, sans backend ni comptes utilisateurs.
+
+**Bento for VTubers** existe pour :
+
+- proposer une **version hébergée** du bento
+- permettre aux VTubers de publier leur page sans gérer le déploiement
+- rester sur une **solution open-source**
+- soutenir indirectement le développement d’OpenBento
+- offrir une alternative aux services propriétaires de link-in-bio
+
+Le cœur du builder reste basé sur OpenBento, mais l’export devient une **page accessible via une URL du site**.
+
+---
+
+## ✨ Fonctionnalités
+
+### 🧱 Bento Builder (hérité d’OpenBento)
+
+- Éditeur visuel **drag & drop** (grille 9×9)
+- 7 types de blocs :
+  - 🔗 Links
+  - 🖼️ Media (images & GIFs)
+  - 📺 YouTube
+  - 📝 Text
+  - 🌐 Social (26+ plateformes)
+  - 📍 Map
+  - ⬜ Spacer
+- Personnalisation avancée :
+  - couleurs et gradients
+  - arrière-plans personnalisés
+  - avatars (formes, bordures, ombres)
+- Export **React / Vite / Tailwind** toujours disponible
+
+---
+
+### 🌐 Spécificités Bento for VTubers
+
+- Comptes utilisateurs
+- Publication automatique sur :
+  https://bento.frvtubers.com/<username>
+- Mise à jour du bento sans redéploiement manuel
+- Pensé pour les VTubers et créateurs :
+  - Twitch / YouTube
+  - réseaux sociaux
+  - liens de stream, dons, merch, etc.
+- Base évolutive pour des blocs spécifiques VTubers
+
+---
+
+## 🔓 Open-source & philosophie
+
+- Projet **open-source**
+- Fork assumé d’OpenBento
+- Licence **MIT**
+- Aucune captation ou revente de données
+- Possibilité d’exporter et d’auto-héberger son bento
+
+Même avec une solution hébergée, l’objectif est de **laisser le contrôle aux créateurs**, dans l'esprit des projets qu'on fais sous le nom FRVtubers.
+
+---
+
+## 🛠️ Stack technique
+
+### Builder
+
+- React
+- Vite
+- TypeScript
+- Tailwind CSS
+
+### Plateforme (fork)
+
+- Backend pour la gestion des utilisateurs
+- Génération d’URLs publiques
+- Hébergement centralisé des pages bento
+
+Les détails techniques peuvent évoluer avec le projet.
+
+---
+
+## 🤝 Contributions
+
+Les contributions sont les bienvenues.
+
+Vous pouvez contribuer pour :
+
+- améliorer le builder
+- ajouter des blocs spécifiques VTubers
+- améliorer l’UX/UI
+- corriger des bugs
+- traductions
+
+Le projet reste aligné avec l’esprit et la philosophie d’OpenBento. Toutes évolution sera reprise pour le reproposer par la suite à OpenBento et aider au développement de l'outil open-source dès que possible.
+
+---
+
+## 📄 Licence et crédits
+
+Ce projet est un **fork d’OpenBento**.
+
+Projet original :
+
+- Yoan Bernabeu — GitHub : @yoanbernabeu
+- Anis Ayari — GitHub : @anisayari
+
+Licence : **MIT**
+
+Merci aux auteurs originaux et à la communauté open-source.
+
+---
+
+## 🌱 Vision
+
+Construire une solution durable, ouverte et respectueuse pour les VTubers et créateurs, sans dépendre de plateformes fermées ou en ayant une plateforme d'initiative open-source comme FRVtubers.
