@@ -16,6 +16,13 @@ out/
 supabase/.temp/
 .supabase-config.json
 .temp/
+data/*.sqlite
+data/*.db
+prisma/*.db
+prisma/*.sqlite
+prisma/*.sqlite-journal
+bento.sqlite
+bento.sqlite-journal
 
 # Editor directories and files
 .vscode/*
