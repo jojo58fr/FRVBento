@@ -115,6 +115,19 @@ export const useFrvAuth = () => {
     setError(null);
     try {
       const baseUrl = authOrigin.replace(/\/$/, '');
+      const callbackUrl =
+        callbackBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+      const sameOrigin =
+        typeof window !== 'undefined' && window.location.origin === authOrigin;
+
+      // Cross-origin: avoid CORS by doing a full redirect to the auth origin
+      if (!sameOrigin) {
+        window.location.href = `${baseUrl}/api/auth/signout?callbackUrl=${encodeURIComponent(
+          callbackUrl
+        )}`;
+        return;
+      }
+
       const csrfRes = await fetch(`${baseUrl}/api/auth/csrf`, {
         method: 'GET',
         credentials: 'include',
@@ -125,8 +138,6 @@ export const useFrvAuth = () => {
       if (!csrfToken) {
         throw new Error('Failed to fetch CSRF token');
       }
-      const callbackUrl =
-        callbackBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
       const body = new URLSearchParams();
       body.set('csrfToken', csrfToken);
       body.set('callbackUrl', callbackUrl);
