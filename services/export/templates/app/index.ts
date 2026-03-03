@@ -98,9 +98,11 @@ export default function App() {
 
   const avatarStyle = { borderRadius: '${avatarRadius}', boxShadow: '${avatarShadow}', border: '${avatarBorder}' }
   const bgStyle: React.CSSProperties = ${bgStyle}
+  const customCss = profile.customCss || ''
 
   return (
     <div className="min-h-screen font-sans" style={bgStyle}>
+      {customCss ? <style>{customCss}</style> : null}
       ${generateBackgroundBlur(profile.backgroundImage, profile.backgroundBlur)}
       <div className="relative z-10">
 ${generateDesktopLayout(layoutParams)}

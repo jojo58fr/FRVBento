@@ -1,3 +1,5 @@
+import { fetchFrvtubersSession } from 'frvtubers-core';
+
 interface VerifyResult {
   ok: boolean;
   status: number;
@@ -11,6 +13,46 @@ const buildVerifyUrl = () => {
   if (!base) return null;
   const path = process.env.FRVTUBERS_API_VERIFY_PATH?.trim() || '/auth/verify';
   return `${base.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
+};
+
+const getAuthOrigin = () => {
+  const origin = process.env.FRVTUBERS_AUTH_ORIGIN?.trim();
+  return origin || null;
+};
+
+export const verifyFrvSessionFromCookie = async (
+  cookieHeader?: string
+): Promise<VerifyResult> => {
+  const authOrigin = getAuthOrigin();
+  if (!authOrigin) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'FRVTUBERS_AUTH_ORIGIN is not configured',
+      skipped: true,
+    };
+  }
+
+  if (!cookieHeader) {
+    return { ok: false, status: 401, error: 'Missing session cookie' };
+  }
+
+  try {
+    const { status, data } = await fetchFrvtubersSession({
+      authOrigin,
+      cookieHeader,
+    });
+    if (status !== 200 || !data) {
+      return { ok: false, status: 401, error: 'FRVtubers session missing' };
+    }
+    return { ok: true, status: 200, payload: data };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 500,
+      error: error instanceof Error ? error.message : 'Auth verification failed',
+    };
+  }
 };
 
 export const verifyFrvAccessToken = async (token: string): Promise<VerifyResult> => {

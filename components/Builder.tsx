@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import QRCode from 'qrcode';
 import { UserProfile, BlockData, BlockType, SavedBento, AvatarStyle } from '../types';
 import Block from './Block';
 import EditorSidebar from './EditorSidebar';
@@ -7,6 +8,7 @@ import SettingsModal from './SettingsModal';
 import ImageCropModal from './ImageCropModal';
 import { useHistory } from '../hooks/useHistory';
 import { useSaveStatus } from '../hooks/useSaveStatus';
+import { useFrvAuth } from '../hooks/useFrvAuth';
 import AvatarStyleModal from './AvatarStyleModal';
 import AIGeneratorModal from './AIGeneratorModal';
 import { exportSite, type ExportDeploymentTarget } from '../services/export';
@@ -45,6 +47,9 @@ import {
   Sparkles,
   Save,
   AlertCircle,
+  LogIn,
+  LogOut,
+  UserCircle,
 } from 'lucide-react';
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -444,7 +449,18 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   >('idle');
   const [publicSlugMessage, setPublicSlugMessage] = useState<string>('');
   const [publicSlugLoading, setPublicSlugLoading] = useState(false);
+  const [publicSlugDeployChecked, setPublicSlugDeployChecked] = useState(false);
+  const [publicQrDataUrl, setPublicQrDataUrl] = useState<string | null>(null);
+  const [publicQrLoading, setPublicQrLoading] = useState(false);
+  const [publicQrError, setPublicQrError] = useState<string | null>(null);
   const [showDeleteSlugConfirm, setShowDeleteSlugConfirm] = useState(false);
+  const [isPublishedSyncing, setIsPublishedSyncing] = useState(false);
+  const publishSyncRef = useRef<{
+    timer: number | null;
+    inFlight: boolean;
+    pending: { slug: string; bento: SavedBento; signature: string } | null;
+    lastSignature: string | null;
+  }>({ timer: null, inFlight: false, pending: null, lastSignature: null });
 
   const [analyticsDays, setAnalyticsDays] = useState<number>(30);
   const [analyticsAdminToken, setAnalyticsAdminToken] = useState<string>(() => {
@@ -480,6 +496,15 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     setSaved,
     setError,
   } = useSaveStatus();
+  const {
+    enabled: authEnabled,
+    loading: authLoading,
+    user: frvUser,
+    isAuthenticated,
+    login,
+    logout,
+  } = useFrvAuth();
+  const canPublishPublicUrl = !authEnabled || isAuthenticated;
 
   const gridRef = useRef<HTMLElement | null>(null);
   // Store the offset from mouse to block's top-left corner when dragging
@@ -521,7 +546,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         setGridVersion(nextGridVersion);
         // Save migrated/normalized blocks if they changed
         if (normalizedBlocks !== bento.data.blocks || nextGridVersion !== bento.data.gridVersion) {
-          updateBentoData(bento.id, {
+          void updateBentoData(bento.id, {
             profile: bento.data.profile,
             blocks: normalizedBlocks,
             gridVersion: nextGridVersion,
@@ -536,22 +561,100 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     loadBento();
   }, [reset]);
 
+  const normalizeSlug = (value: string) =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]/g, '')
+      .replace(/-{2,}/g, '-')
+      .replace(/^[-_]+|[-_]+$/g, '');
+
+  const schedulePublishedSync = useCallback(
+    (bento: SavedBento, slug: string) => {
+      const clean = normalizeSlug(slug);
+      if (!clean) return;
+
+      const signature = JSON.stringify({ slug: clean, data: bento.data });
+      if (
+        signature === publishSyncRef.current.lastSignature &&
+        !publishSyncRef.current.inFlight &&
+        !publishSyncRef.current.pending
+      ) {
+        setIsPublishedSyncing(false);
+        return;
+      }
+
+      publishSyncRef.current.pending = { slug: clean, bento, signature };
+      setIsPublishedSyncing(true);
+
+      if (publishSyncRef.current.timer) {
+        window.clearTimeout(publishSyncRef.current.timer);
+      }
+
+      publishSyncRef.current.timer = window.setTimeout(async () => {
+        const pending = publishSyncRef.current.pending;
+        if (!pending || publishSyncRef.current.inFlight) return;
+
+        publishSyncRef.current.inFlight = true;
+        publishSyncRef.current.pending = null;
+
+        try {
+          const res = await fetch(`/api/bento/${encodeURIComponent(pending.slug)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bento: pending.bento }),
+          });
+          if (res.ok) {
+            publishSyncRef.current.lastSignature = pending.signature;
+          }
+        } catch {
+          // Non-blocking: local save already happened. We'll try again on next change.
+        } finally {
+          publishSyncRef.current.inFlight = false;
+          if (publishSyncRef.current.pending) {
+            schedulePublishedSync(publishSyncRef.current.pending.bento, pending.slug);
+          } else {
+            setIsPublishedSyncing(false);
+          }
+        }
+      }, 600);
+    },
+    [normalizeSlug]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (publishSyncRef.current.timer) {
+        window.clearTimeout(publishSyncRef.current.timer);
+      }
+    };
+  }, []);
+
   // Auto-save function - immediate save with status indicator
   const autoSave = useCallback(
-    (newProfile: UserProfile, newBlocks: BlockData[]) => {
+    async (newProfile: UserProfile, newBlocks: BlockData[]) => {
       if (!activeBento) return;
 
       setSaving();
 
       try {
-        // Save immediately
-        updateBentoData(activeBento.id, {
+        const saved = await updateBentoData(activeBento.id, {
           profile: newProfile,
           blocks: newBlocks,
           gridVersion,
         });
+        if (!saved) throw new Error('Save failed');
 
-        // Show "saved" status briefly
+        if (newProfile.publicSlug && canPublishPublicUrl) {
+          const currentBento: SavedBento = {
+            ...activeBento,
+            data: { profile: newProfile, blocks: newBlocks, gridVersion },
+          };
+          schedulePublishedSync(currentBento, newProfile.publicSlug);
+        } else if (newProfile.publicSlug && !canPublishPublicUrl) {
+          setIsPublishedSyncing(false);
+        }
+
         setTimeout(() => {
           setSaved();
         }, 300);
@@ -559,13 +662,21 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         setError();
       }
     },
-    [activeBento, gridVersion, setSaving, setSaved, setError]
+    [
+      activeBento,
+      gridVersion,
+      setSaving,
+      setSaved,
+      setError,
+      schedulePublishedSync,
+      canPublishPublicUrl,
+    ]
   );
 
   // Manual save function for button and keyboard shortcut
   const handleManualSave = useCallback(() => {
     if (!activeBento || !profile) return;
-    autoSave(profile, blocks);
+    void autoSave(profile, blocks);
   }, [activeBento, profile, blocks, autoSave]);
 
   // Keyboard shortcut: Ctrl/Cmd + S to save
@@ -585,7 +696,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     (newProfile: UserProfile | ((prev: UserProfile) => UserProfile)) => {
       const updated = typeof newProfile === 'function' ? newProfile(profile!) : newProfile;
       setSiteData({ profile: updated, blocks });
-      autoSave(updated, blocks);
+      void autoSave(updated, blocks);
     },
     [profile, blocks, setSiteData, autoSave]
   );
@@ -599,7 +710,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
 
       // Ενημερώνουμε το ενιαίο state (snapshot)
       setSiteData({ profile, blocks: resolved });
-      if (profile) autoSave(profile, resolved);
+      if (profile) void autoSave(profile, resolved);
     },
     [profile, blocks, setSiteData, autoSave]
   );
@@ -612,7 +723,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     (bento: SavedBento) => {
       // Save current before switching
       if (activeBento && profile) {
-        updateBentoData(activeBento.id, { profile, blocks, gridVersion });
+        void updateBentoData(activeBento.id, { profile, blocks, gridVersion });
       }
 
       const dataGridVersion = bento.data.gridVersion ?? GRID_VERSION;
@@ -632,7 +743,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       setEditingBlockId(null);
 
       if (normalizedBlocks !== bento.data.blocks || nextGridVersion !== bento.data.gridVersion) {
-        updateBentoData(bento.id, {
+        void updateBentoData(bento.id, {
           profile: bento.data.profile,
           blocks: normalizedBlocks,
           gridVersion: nextGridVersion,
@@ -807,6 +918,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     setPublicSlug(profile?.publicSlug || '');
     setPublicSlugStatus('idle');
     setPublicSlugMessage('');
+    setPublicSlugDeployChecked(false);
     setShowDeployModal(true);
   };
 
@@ -828,16 +940,12 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       data: { profile, blocks, gridVersion },
     };
   };
-
-  const normalizeSlug = (value: string) =>
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9-_]/g, '')
-      .replace(/-{2,}/g, '-')
-      .replace(/^[-_]+|[-_]+$/g, '');
-
   const checkPublicSlug = async (slug: string) => {
+    if (!canPublishPublicUrl) {
+      setPublicSlugStatus('error');
+      setPublicSlugMessage('Connexion FRVtubers requise pour vérifier une URL.');
+      return;
+    }
     const clean = normalizeSlug(slug);
     if (!clean) {
       setPublicSlugStatus('error');
@@ -866,14 +974,19 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     }
   };
 
-  const savePublicSlug = async () => {
+  const savePublicSlug = async (): Promise<boolean> => {
     const current = buildCurrentBento();
-    if (!current) return;
+    if (!current) return false;
+    if (!canPublishPublicUrl) {
+      setPublicSlugStatus('error');
+      setPublicSlugMessage('Connexion FRVtubers requise pour associer une URL.');
+      return false;
+    }
     const clean = normalizeSlug(publicSlug);
     if (!clean) {
       setPublicSlugStatus('error');
       setPublicSlugMessage('Please enter a valid slug.');
-      return;
+      return false;
     }
     setPublicSlugLoading(true);
     try {
@@ -881,7 +994,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       if (exists.ok) {
         setPublicSlugStatus('taken');
         setPublicSlugMessage('This URL is already registered.');
-        return;
+        return false;
       }
       const res = await fetch('/api/bento', {
         method: 'POST',
@@ -891,52 +1004,27 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       if (!res.ok) {
         setPublicSlugStatus('error');
         setPublicSlugMessage('Failed to save URL.');
-        return;
+        return false;
       }
       setPublicSlugStatus('available');
-      setPublicSlugMessage(`Saved: bento.frvtubers.com/${clean}`);
+      setPublicSlugMessage(`URL publiée : bento.frvtubers.com/${clean}`);
       handleSetProfile((prev) => ({ ...prev, publicSlug: clean }));
+      return true;
     } catch {
       setPublicSlugStatus('error');
       setPublicSlugMessage('Network error while saving URL.');
-    } finally {
-      setPublicSlugLoading(false);
-    }
-  };
-
-  const updatePublicSlug = async () => {
-    const current = buildCurrentBento();
-    if (!current) return;
-    const clean = normalizeSlug(publicSlug);
-    if (!clean) {
-      setPublicSlugStatus('error');
-      setPublicSlugMessage('Please enter a valid slug.');
-      return;
-    }
-    setPublicSlugLoading(true);
-    try {
-      const res = await fetch(`/api/bento/${encodeURIComponent(clean)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bento: current }),
-      });
-      if (!res.ok) {
-        setPublicSlugStatus('error');
-        setPublicSlugMessage('Failed to update URL.');
-        return;
-      }
-      setPublicSlugStatus('available');
-      setPublicSlugMessage(`Updated: bento.frvtubers.com/${clean}`);
-      handleSetProfile((prev) => ({ ...prev, publicSlug: clean }));
-    } catch {
-      setPublicSlugStatus('error');
-      setPublicSlugMessage('Network error while updating URL.');
+      return false;
     } finally {
       setPublicSlugLoading(false);
     }
   };
 
   const deletePublicSlug = async () => {
+    if (!canPublishPublicUrl) {
+      setPublicSlugStatus('error');
+      setPublicSlugMessage('Connexion FRVtubers requise pour supprimer une URL.');
+      return;
+    }
     const clean = normalizeSlug(publicSlug);
     if (!clean) return;
     setPublicSlugLoading(true);
@@ -948,8 +1036,9 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         return;
       }
       setPublicSlugStatus('idle');
-      setPublicSlugMessage('URL removed from server.');
+      setPublicSlugMessage('Bento dépublié.');
       handleSetProfile((prev) => ({ ...prev, publicSlug: '' }));
+      setIsPublishedSyncing(false);
     } catch {
       setPublicSlugStatus('error');
       setPublicSlugMessage('Network error while deleting URL.');
@@ -959,21 +1048,61 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   };
 
   const normalizedPublicSlug = normalizeSlug(publicSlug);
+  const isPublicUrlPublished = !!profile?.publicSlug;
+  const canEditPublicUrl = !isPublicUrlPublished;
   const canSavePublicSlug =
+    canPublishPublicUrl &&
     !publicSlugLoading &&
     !!normalizedPublicSlug &&
     publicSlugStatus !== 'taken' &&
     publicSlugStatus !== 'checking';
-  const canUpdatePublicSlug =
-    !publicSlugLoading &&
-    !!normalizedPublicSlug &&
-    (publicSlugStatus === 'taken' ||
-      normalizedPublicSlug === normalizeSlug(profile?.publicSlug || ''));
   const canDeletePublicSlug =
+    canPublishPublicUrl &&
     !publicSlugLoading &&
     !!normalizedPublicSlug &&
     (publicSlugStatus === 'taken' ||
       normalizedPublicSlug === normalizeSlug(profile?.publicSlug || ''));
+
+  useEffect(() => {
+    if (isPublicUrlPublished || publicSlugStatus !== 'available') {
+      setPublicSlugDeployChecked(false);
+    }
+  }, [isPublicUrlPublished, publicSlugStatus]);
+
+  const publicUrl =
+    profile?.publicSlug ? `https://bento.frvtubers.com/${profile.publicSlug}` : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    const generateQr = async () => {
+      if (!publicUrl) {
+        setPublicQrDataUrl(null);
+        setPublicQrError(null);
+        return;
+      }
+      setPublicQrLoading(true);
+      setPublicQrError(null);
+      try {
+        const dataUrl = await QRCode.toDataURL(publicUrl, {
+          width: 256,
+          margin: 1,
+          errorCorrectionLevel: 'M',
+        });
+        if (!cancelled) setPublicQrDataUrl(dataUrl);
+      } catch (err) {
+        if (!cancelled) {
+          setPublicQrError('Impossible de générer le QR code.');
+          setPublicQrDataUrl(null);
+        }
+      } finally {
+        if (!cancelled) setPublicQrLoading(false);
+      }
+    };
+    void generateQr();
+    return () => {
+      cancelled = true;
+    };
+  }, [publicUrl]);
 
   // Import bento from JSON file
   const handleImportJSON = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -996,7 +1125,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       });
       reset({ profile: bento.data.profile, blocks: normalizedBlocks });
       setEditingBlockId(null);
-      updateBentoData(bento.id, {
+      void updateBentoData(bento.id, {
         profile: bento.data.profile,
         blocks: normalizedBlocks,
         gridVersion: nextGridVersion,
@@ -1658,10 +1787,34 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium">
                 <Globe
                   size={16}
-                  className={profile.publicSlug ? 'text-emerald-600' : 'text-red-600'}
+                  className={
+                    profile.publicSlug
+                      ? !canPublishPublicUrl
+                        ? 'text-amber-600'
+                        : isPublishedSyncing
+                          ? 'text-amber-600'
+                          : 'text-emerald-600'
+                      : 'text-red-600'
+                  }
                 />
-                <span className={profile.publicSlug ? 'text-emerald-600' : 'text-red-600'}>
-                  {profile.publicSlug ? 'Published' : 'Not published'}
+                <span
+                  className={
+                    profile.publicSlug
+                      ? !canPublishPublicUrl
+                        ? 'text-amber-600'
+                        : isPublishedSyncing
+                          ? 'text-amber-600'
+                          : 'text-emerald-600'
+                      : 'text-red-600'
+                  }
+                >
+                  {profile.publicSlug
+                    ? !canPublishPublicUrl
+                      ? 'Connexion requise'
+                      : isPublishedSyncing
+                        ? "En cours d'envoi"
+                        : 'Published'
+                    : 'Not published'}
                 </span>
               </div>
               <div className="h-6 w-px bg-gray-200 mx-1"></div>
@@ -1696,7 +1849,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                 className="bg-white px-3.5 py-2 rounded-lg shadow-sm border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {isSidebarOpen ? <Eye size={16} /> : <Layout size={16} />}
-                <span className="hidden sm:inline">{isSidebarOpen ? 'Preview' : 'Edit'}</span>
+                <span className="hidden sm:inline">{isSidebarOpen ? 'Fermer le menu' : 'Éditer'}</span>
               </button>
 
               <button
@@ -1709,6 +1862,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                 <Settings size={16} />
                 <span className="hidden sm:inline">Settings</span>
               </button>
+
 
               {isDev && (
                 <button
@@ -1757,6 +1911,29 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                 <Download size={16} />
                 <span className="hidden sm:inline">Deploy</span>
               </button>
+
+              
+              {authEnabled && (
+                <button
+                  type="button"
+                  aria-label={isAuthenticated ? 'Logout from FRVtubers' : 'Login with FRVtubers'}
+                  onClick={isAuthenticated ? () => void logout() : login}
+                  disabled={authLoading}
+                  className="bg-white px-3.5 py-2 rounded-lg shadow-sm border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                  title={
+                    isAuthenticated
+                      ? `Connecté : ${
+                          frvUser?.displayName || frvUser?.name || frvUser?.username || 'Utilisateur'
+                        }`
+                      : 'Connexion FRVtubers'
+                  }
+                >
+                  {isAuthenticated ? <LogOut size={16} /> : <LogIn size={16} />}
+                  <span className="hidden sm:inline">
+                    {isAuthenticated ? 'Déconnexion' : 'Connexion'}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </nav>
@@ -2403,7 +2580,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         onBentoNameChange={(name) => {
           if (activeBento) {
             setActiveBento({ ...activeBento, name });
-            renameBento(activeBento.id, name);
+            void renameBento(activeBento.id, name);
           }
         }}
         onExportJson={handleExportJSON}
@@ -2478,7 +2655,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                   <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center text-green-700 mb-3">
                     <Share2 size={18} />
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900">Deploy</h2>
+                  <h2 className="text-xl font-bold text-gray-900">Deploy &amp; QR Code</h2>
                   <p className="text-gray-500 mt-1 text-sm">
                     Publie ton bento sur l&apos;URL FRVBento. Le déploiement local est réservé au
                     mode expert.
@@ -2519,6 +2696,21 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
 
                 {!deployExpertMode ? (
                   <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-4">
+                    {authEnabled && !isAuthenticated && (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+                        <div className="flex items-center gap-2 font-semibold">
+                          <UserCircle size={18} />
+                          Connexion FRVtubers requise pour générer une URL.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={login}
+                          className="sm:ml-auto px-3 py-2 rounded-lg bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition-colors"
+                        >
+                          Se connecter
+                        </button>
+                      </div>
+                    )}
                     <div>
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                         URL publique
@@ -2536,10 +2728,12 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                             setPublicSlugMessage('');
                           }}
                           onBlur={() => {
-                            if (publicSlug.trim()) void checkPublicSlug(publicSlug);
+                            if (canEditPublicUrl && publicSlug.trim())
+                              void checkPublicSlug(publicSlug);
                           }}
                           placeholder="tonpseudo"
-                          className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                          disabled={!canPublishPublicUrl || !canEditPublicUrl}
+                          className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
                         />
                       </div>
                       {publicSlugMessage && (
@@ -2557,39 +2751,107 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                       )}
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <button
-                        type="button"
-                        onClick={() => checkPublicSlug(publicSlug)}
-                        disabled={!publicSlug.trim() || publicSlugStatus === 'checking'}
-                        className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        {publicSlugStatus === 'checking' ? 'Checking…' : 'Vérifier'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={savePublicSlug}
-                        disabled={!canSavePublicSlug}
-                        className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-50"
-                      >
-                        Associer l&apos;URL
-                      </button>
-                      <button
-                        type="button"
-                        onClick={updatePublicSlug}
-                        disabled={!canUpdatePublicSlug}
-                        className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50"
-                      >
-                        Modifier l&apos;URL
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowDeleteSlugConfirm(true)}
-                        disabled={!canDeletePublicSlug}
-                        className="px-4 py-2 rounded-lg bg-red-100 text-red-700 text-sm font-semibold hover:bg-red-200 disabled:opacity-50"
-                      >
-                        Supprimer
-                      </button>
+                    <div className="space-y-2">
+                      {!isPublicUrlPublished && (
+                        <button
+                          type="button"
+                          onClick={() => checkPublicSlug(publicSlug)}
+                          disabled={
+                            !canPublishPublicUrl ||
+                            !publicSlug.trim() ||
+                            publicSlugStatus === 'checking'
+                          }
+                          className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {publicSlugStatus === 'checking' ? 'Vérification…' : 'Vérifier'}
+                        </button>
+                      )}
+
+                      {!isPublicUrlPublished && publicSlugStatus === 'available' && (
+                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                          <input
+                            type="checkbox"
+                            checked={publicSlugDeployChecked}
+                            onChange={async (e) => {
+                              const nextChecked = e.target.checked;
+                              setPublicSlugDeployChecked(nextChecked);
+                              if (nextChecked) {
+                                const ok = await savePublicSlug();
+                                if (!ok) setPublicSlugDeployChecked(false);
+                              }
+                            }}
+                            disabled={!canSavePublicSlug}
+                            className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                          />
+                          Déployer sur cette URL
+                        </label>
+                      )}
+
+                      {isPublicUrlPublished && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">URL publiée</p>
+                              <p className="text-xs text-gray-500">
+                                Dépublie pour modifier l&apos;adresse.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowDeleteSlugConfirm(true)}
+                              disabled={!canDeletePublicSlug}
+                              className="px-3 py-2 rounded-lg bg-red-100 text-red-700 text-xs font-bold hover:bg-red-200 disabled:opacity-50"
+                            >
+                              Dépublier
+                            </button>
+                          </div>
+
+                          <div className="bg-white border border-gray-200 rounded-lg p-3 flex flex-col sm:flex-row items-center gap-3">
+                            <div className="flex items-center justify-center bg-gray-50 border border-gray-200 rounded-lg p-2">
+                              {publicQrLoading ? (
+                                <div className="w-32 h-32 flex items-center justify-center text-xs text-gray-400">
+                                  Génération…
+                                </div>
+                              ) : publicQrDataUrl ? (
+                                <img
+                                  src={publicQrDataUrl}
+                                  alt="QR code"
+                                  className="w-32 h-32"
+                                />
+                              ) : (
+                                <div className="w-32 h-32 flex items-center justify-center text-xs text-gray-400">
+                                  QR indisponible
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 space-y-2">
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900">
+                                  QR code public
+                                </p>
+                                <p className="text-xs text-gray-500">{publicUrl}</p>
+                              </div>
+                              {publicQrError && (
+                                <p className="text-xs text-red-600">{publicQrError}</p>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!publicQrDataUrl || !profile?.publicSlug) return;
+                                  const link = document.createElement('a');
+                                  link.href = publicQrDataUrl;
+                                  link.download = `frvbento-qr-${profile.publicSlug}.png`;
+                                  link.click();
+                                }}
+                                disabled={!publicQrDataUrl}
+                                className="px-3 py-2 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-black disabled:opacity-50"
+                              >
+                                Télécharger le QR code
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (

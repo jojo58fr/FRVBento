@@ -8,6 +8,7 @@
     "avatarUrl": "",
     "theme": "light",
     "primaryColor": "blue",
+    "customCss": "",
     "showBranding": true,
     "analytics": {
       "enabled": false,

@@ -107,6 +107,9 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
       className={`min-h-screen font-sans relative ${isDark ? 'text-gray-100' : 'text-gray-900'}`}
       style={bgStyle}
     >
+      {profile.customCss && profile.customCss.trim().length > 0 && (
+        <style>{profile.customCss}</style>
+      )}
       {/* Background blur overlay */}
       {profile.backgroundImage && profile.backgroundBlur && profile.backgroundBlur > 0 && (
         <div

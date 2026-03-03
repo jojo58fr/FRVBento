@@ -14,7 +14,7 @@ export default function PublicBentoPage({ bento }: PublicBentoProps) {
 
 export const getServerSideProps: GetServerSideProps<PublicBentoProps> = async (ctx) => {
   const username = typeof ctx.params?.username === 'string' ? ctx.params.username : '';
-  const record = username ? getBentoByUsername(username) : null;
+  const record = username ? await getBentoByUsername(username) : null;
 
   if (!record) {
     return { notFound: true };

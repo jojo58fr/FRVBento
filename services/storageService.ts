@@ -1,8 +1,7 @@
-import { SavedBento, SiteData, BlockType, BlockData, UserProfile } from '../types';
-import { AVATAR_PLACEHOLDER } from '../constants';
+import { SavedBento, SiteData, BlockData, UserProfile } from '../types';
 
-const STORAGE_KEY = 'openbento_bentos';
-const ACTIVE_BENTO_KEY = 'openbento_active_bento';
+const CACHE_KEY = 'frvbento_bentos_cache';
+const ACTIVE_BENTO_KEY = 'frvbento_active_bento';
 const ASSETS_KEY = 'openbento_assets';
 const INITIALIZED_KEY = 'openbento_initialized';
 export const GRID_VERSION = 2;
@@ -27,154 +26,117 @@ export interface BentoJSON {
   exportedAt?: number;
 }
 
-// Generate unique ID
-const generateId = (): string => {
-  return `bento_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-};
-
-// ============ BENTO STORAGE ============
-
-// Get all saved bentos
-export const getAllBentos = (): SavedBento[] => {
+const readCache = (): SavedBento[] => {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(CACHE_KEY);
     if (!stored) return [];
     return JSON.parse(stored);
-  } catch (e) {
-    console.error('Failed to get bentos from localStorage:', e);
+  } catch {
     return [];
   }
 };
 
-// Get a specific bento by ID
-export const getBento = (id: string): SavedBento | null => {
-  const bentos = getAllBentos();
-  return bentos.find((b) => b.id === id) || null;
-};
-
-// Save a bento (create or update)
-export const saveBento = (bento: SavedBento): void => {
+const writeCache = (bentos: SavedBento[]): void => {
   try {
-    const bentos = getAllBentos();
-    const existingIndex = bentos.findIndex((b) => b.id === bento.id);
-
-    const updatedBento = {
-      ...bento,
-      updatedAt: Date.now(),
-    };
-
-    if (existingIndex >= 0) {
-      bentos[existingIndex] = updatedBento;
-    } else {
-      bentos.push(updatedBento);
-    }
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bentos));
-  } catch (e) {
-    console.error('Failed to save bento to localStorage:', e);
+    localStorage.setItem(CACHE_KEY, JSON.stringify(bentos));
+  } catch {
+    // ignore cache errors
   }
 };
 
-// Create a new bento from JSON template
+const updateCacheItem = (bento: SavedBento): void => {
+  const items = readCache();
+  const index = items.findIndex((b) => b.id === bento.id);
+  if (index >= 0) {
+    items[index] = bento;
+  } else {
+    items.push(bento);
+  }
+  writeCache(items);
+};
+
+const removeCacheItem = (id: string): void => {
+  const items = readCache().filter((b) => b.id !== id);
+  writeCache(items);
+};
+
+const fetchJson = async <T>(input: RequestInfo, init?: RequestInit): Promise<T> => {
+  const res = await fetch(input, init);
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    throw new Error(errorText || `Request failed (${res.status})`);
+  }
+  return (await res.json()) as T;
+};
+
+// ============ BENTO STORAGE (REMOTE + READ-ONLY CACHE) ============
+
+export const getAllBentos = async (): Promise<SavedBento[]> => {
+  try {
+    const data = await fetchJson<{ ok: boolean; items: SavedBento[] }>('/api/bentos', {
+      headers: { Accept: 'application/json' },
+    });
+    if (Array.isArray(data.items)) {
+      writeCache(data.items);
+      return data.items;
+    }
+  } catch {
+    // ignore and fallback to cache
+  }
+  return readCache();
+};
+
+export const getBento = async (id: string): Promise<SavedBento | null> => {
+  if (!id) return null;
+  try {
+    const data = await fetchJson<{ ok: boolean; bento: SavedBento }>(
+      `/api/bentos/${encodeURIComponent(id)}`,
+      { headers: { Accept: 'application/json' } }
+    );
+    if (data?.bento) {
+      updateCacheItem(data.bento);
+      return data.bento;
+    }
+  } catch {
+    // ignore and fallback to cache
+  }
+  return readCache().find((b) => b.id === id) || null;
+};
+
 export const createBentoFromJSON = async (
-  templatePath: string = '/bentos/default.json'
+  template: BentoJSON
 ): Promise<SavedBento> => {
-  try {
-    const response = await fetch(templatePath);
-    if (!response.ok) throw new Error('Failed to load template');
+  const data = await fetchJson<{ ok: boolean; bento: SavedBento }>('/api/bentos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bentoJson: template }),
+  });
+  updateCacheItem(data.bento);
+  setActiveBentoId(data.bento.id);
+  return data.bento;
+};
 
-    const template: BentoJSON = await response.json();
-    const now = Date.now();
+export const createBento = async (name: string): Promise<SavedBento> => {
+  const data = await fetchJson<{ ok: boolean; bento: SavedBento }>('/api/bentos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  updateCacheItem(data.bento);
+  setActiveBentoId(data.bento.id);
+  return data.bento;
+};
 
-    const newBento: SavedBento = {
-      id: generateId(),
-      name: template.name || 'My Bento',
-      createdAt: now,
-      updatedAt: now,
-      data: {
-        gridVersion: template.gridVersion ?? GRID_VERSION,
-        profile: {
-          ...template.profile,
-          avatarUrl: template.profile.avatarUrl || AVATAR_PLACEHOLDER,
-        },
-        blocks: template.blocks.map((b) => ({
-          ...b,
-          id: generateId(), // Generate new IDs to avoid conflicts
-        })),
-      },
-    };
-
-    saveBento(newBento);
-    setActiveBentoId(newBento.id);
-
-    return newBento;
-  } catch (e) {
-    console.error('Failed to create bento from JSON:', e);
-    // Fallback to default
-    return createBento('My Bento');
+export const deleteBento = async (id: string): Promise<void> => {
+  await fetchJson('/api/bentos/' + encodeURIComponent(id), {
+    method: 'DELETE',
+  });
+  removeCacheItem(id);
+  if (getActiveBentoId() === id) {
+    localStorage.removeItem(ACTIVE_BENTO_KEY);
   }
 };
 
-// Create a new bento with default data
-export const createBento = (name: string): SavedBento => {
-  const now = Date.now();
-  const newBento: SavedBento = {
-    id: generateId(),
-    name: name || `Bento ${getAllBentos().length + 1}`,
-    createdAt: now,
-    updatedAt: now,
-    data: {
-      gridVersion: GRID_VERSION,
-        profile: {
-          name: name || 'My Bento',
-          bio: 'Digital creator & developer.\nBuilding awesome things.',
-          avatarUrl: AVATAR_PLACEHOLDER,
-          theme: 'light' as const,
-          primaryColor: 'blue',
-          publicSlug: '',
-          showBranding: true,
-          analytics: { enabled: false, supabaseUrl: '' },
-          socialAccounts: [],
-        },
-      blocks: [
-        {
-          id: generateId(),
-          type: BlockType.LINK,
-          title: 'My Website',
-          subtext: 'Visit my site',
-          content: 'https://example.com',
-          colSpan: 3,
-          rowSpan: 3,
-          gridColumn: 1,
-          gridRow: 1,
-          color: 'bg-gray-900',
-          textColor: 'text-white',
-        },
-      ],
-    },
-  };
-
-  saveBento(newBento);
-  setActiveBentoId(newBento.id);
-
-  return newBento;
-};
-
-// Delete a bento
-export const deleteBento = (id: string): void => {
-  try {
-    const bentos = getAllBentos().filter((b) => b.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bentos));
-
-    if (getActiveBentoId() === id) {
-      localStorage.removeItem(ACTIVE_BENTO_KEY);
-    }
-  } catch (e) {
-    console.error('Failed to delete bento from localStorage:', e);
-  }
-};
-
-// Get the currently active bento ID
 export const getActiveBentoId = (): string | null => {
   try {
     return localStorage.getItem(ACTIVE_BENTO_KEY);
@@ -183,16 +145,14 @@ export const getActiveBentoId = (): string | null => {
   }
 };
 
-// Set the active bento ID
 export const setActiveBentoId = (id: string): void => {
   try {
     localStorage.setItem(ACTIVE_BENTO_KEY, id);
-  } catch (e) {
-    console.error('Failed to set active bento ID:', e);
+  } catch {
+    // ignore
   }
 };
 
-// Check if app has been initialized before
 export const isInitialized = (): boolean => {
   try {
     return localStorage.getItem(INITIALIZED_KEY) === 'true';
@@ -201,7 +161,6 @@ export const isInitialized = (): boolean => {
   }
 };
 
-// Mark app as initialized
 export const setInitialized = (): void => {
   try {
     localStorage.setItem(INITIALIZED_KEY, 'true');
@@ -210,72 +169,76 @@ export const setInitialized = (): void => {
   }
 };
 
-// Get the active bento, or create from template if none exists
-export const getOrCreateActiveBento = (): SavedBento => {
+export const getOrCreateActiveBento = async (): Promise<SavedBento> => {
   const activeId = getActiveBentoId();
 
   if (activeId) {
-    const bento = getBento(activeId);
+    const bento = await getBento(activeId);
     if (bento) return bento;
   }
 
-  // Check if there are any bentos
-  const bentos = getAllBentos();
+  const bentos = await getAllBentos();
   if (bentos.length > 0) {
     setActiveBentoId(bentos[0].id);
     return bentos[0];
   }
 
-  // Create a new default bento (sync version for backward compatibility)
   return createBento('My First Bento');
 };
 
-// Initialize app - call this on first load to load from template
 export const initializeApp = async (): Promise<SavedBento> => {
   const activeId = getActiveBentoId();
 
   if (activeId) {
-    const bento = getBento(activeId);
+    const bento = await getBento(activeId);
     if (bento) return bento;
   }
 
-  const bentos = getAllBentos();
+  const bentos = await getAllBentos();
   if (bentos.length > 0) {
     setActiveBentoId(bentos[0].id);
     return bentos[0];
   }
 
-  // First time: load from default template
-  return createBentoFromJSON('/bentos/default.json');
+  return createBento('My First Bento');
 };
 
-// Update just the data of a bento (for auto-save)
-export const updateBentoData = (id: string, data: SiteData): void => {
-  const bento = getBento(id);
-  if (bento) {
-    saveBento({
-      ...bento,
-      data,
-      updatedAt: Date.now(),
-    });
+export const updateBentoData = async (id: string, data: SiteData): Promise<SavedBento | null> => {
+  try {
+    const res = await fetchJson<{ ok: boolean; bento: SavedBento }>(
+      `/api/bentos/${encodeURIComponent(id)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data }),
+      }
+    );
+    updateCacheItem(res.bento);
+    return res.bento;
+  } catch {
+    return null;
   }
 };
 
-// Rename a bento
-export const renameBento = (id: string, newName: string): void => {
-  const bento = getBento(id);
-  if (bento) {
-    saveBento({
-      ...bento,
-      name: newName,
-      updatedAt: Date.now(),
-    });
+export const renameBento = async (id: string, newName: string): Promise<SavedBento | null> => {
+  try {
+    const res = await fetchJson<{ ok: boolean; bento: SavedBento }>(
+      `/api/bentos/${encodeURIComponent(id)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName }),
+      }
+    );
+    updateCacheItem(res.bento);
+    return res.bento;
+  } catch {
+    return null;
   }
 };
 
 // ============ EXPORT / IMPORT ============
 
-// Export a bento to JSON
 export const exportBentoToJSON = (bento: SavedBento): BentoJSON => {
   return {
     id: bento.id,
@@ -288,7 +251,6 @@ export const exportBentoToJSON = (bento: SavedBento): BentoJSON => {
   };
 };
 
-// Download a bento as JSON file
 export const downloadBentoJSON = (bento: SavedBento): void => {
   const json = exportBentoToJSON(bento);
   const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
@@ -303,50 +265,18 @@ export const downloadBentoJSON = (bento: SavedBento): void => {
   URL.revokeObjectURL(url);
 };
 
-// Import a bento from JSON
-export const importBentoFromJSON = (json: BentoJSON): SavedBento => {
-  const now = Date.now();
-
-  const newBento: SavedBento = {
-    id: generateId(), // Always generate new ID to avoid conflicts
-    name: json.name || 'Imported Bento',
-    createdAt: now,
-    updatedAt: now,
-    data: {
-      gridVersion: json.gridVersion ?? GRID_VERSION,
-        profile: {
-          name: json.profile?.name || 'My Bento',
-          bio: json.profile?.bio || '',
-          avatarUrl: json.profile?.avatarUrl || AVATAR_PLACEHOLDER,
-          theme: json.profile?.theme || 'light',
-          primaryColor: json.profile?.primaryColor || 'blue',
-          publicSlug: json.profile?.publicSlug || '',
-          showBranding: json.profile?.showBranding ?? true,
-          analytics: json.profile?.analytics || { enabled: false, supabaseUrl: '' },
-          socialAccounts: json.profile?.socialAccounts || [],
-        },
-      blocks: (json.blocks || []).map((b) => ({
-        ...b,
-        id: generateId(), // Generate new IDs
-      })),
-    },
-  };
-
-  saveBento(newBento);
-  setActiveBentoId(newBento.id);
-
-  return newBento;
+export const importBentoFromJSON = async (json: BentoJSON): Promise<SavedBento> => {
+  return createBentoFromJSON(json);
 };
 
-// Load bento from file input
 export const loadBentoFromFile = (file: File): Promise<SavedBento> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const json = JSON.parse(e.target?.result as string) as BentoJSON;
-        const bento = importBentoFromJSON(json);
+        const bento = await importBentoFromJSON(json);
         resolve(bento);
       } catch {
         reject(new Error('Invalid JSON file'));
@@ -360,7 +290,6 @@ export const loadBentoFromFile = (file: File): Promise<SavedBento> => {
 
 // ============ ASSETS STORAGE ============
 
-// Get all assets
 export const getAssets = (): Asset[] => {
   try {
     const stored = localStorage.getItem(ASSETS_KEY);
@@ -371,7 +300,6 @@ export const getAssets = (): Asset[] => {
   }
 };
 
-// Save assets
 export const saveAssets = (assets: Asset[]): void => {
   try {
     localStorage.setItem(ASSETS_KEY, JSON.stringify(assets));
@@ -380,7 +308,6 @@ export const saveAssets = (assets: Asset[]): void => {
   }
 };
 
-// Add an asset (image uploaded by user)
 export const addAsset = (name: string, type: string, data: string): Asset => {
   const asset: Asset = {
     id: `asset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -397,13 +324,11 @@ export const addAsset = (name: string, type: string, data: string): Asset => {
   return asset;
 };
 
-// Remove an asset
 export const removeAsset = (id: string): void => {
   const assets = getAssets().filter((a) => a.id !== id);
   saveAssets(assets);
 };
 
-// Export assets to JSON
 export const exportAssetsJSON = (): { version: string; lastUpdated: number; assets: Asset[] } => {
   return {
     version: '1.0',
@@ -412,7 +337,6 @@ export const exportAssetsJSON = (): { version: string; lastUpdated: number; asse
   };
 };
 
-// Download assets as JSON
 export const downloadAssetsJSON = (): void => {
   const json = exportAssetsJSON();
   const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
@@ -427,10 +351,9 @@ export const downloadAssetsJSON = (): void => {
   URL.revokeObjectURL(url);
 };
 
-// Clear all data (reset)
 export const clearAllData = (): void => {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(CACHE_KEY);
     localStorage.removeItem(ACTIVE_BENTO_KEY);
     localStorage.removeItem(ASSETS_KEY);
     localStorage.removeItem(INITIALIZED_KEY);

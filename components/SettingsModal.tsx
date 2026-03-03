@@ -601,6 +601,29 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
                   </section>
 
+                  {/* Custom CSS */}
+                  <section className="space-y-3">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      Custom CSS
+                    </h3>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        CSS personnalisée
+                      </label>
+                      <textarea
+                        aria-label="Custom CSS"
+                        value={profile.customCss || ''}
+                        onChange={(e) => setProfile({ ...profile, customCss: e.target.value })}
+                        className="w-full h-40 bg-gray-900 text-emerald-300 font-mono text-xs p-4 rounded-xl border border-gray-800 focus:ring-2 focus:ring-violet-500 focus:outline-none resize-none"
+                        placeholder=".bento-item { border-radius: 24px; }\nbody { letter-spacing: 0.2px; }"
+                        spellCheck={false}
+                      />
+                      <p className="text-xs text-gray-400">
+                        ⚠️ Attention: Cela s'applique sur ta page publique et le preview. Ne s'affiche pas en temps réel.
+                      </p>
+                    </div>
+                  </section>
+
                   {/* Background Section */}
                   <section className="space-y-4">
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">

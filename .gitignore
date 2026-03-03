@@ -34,3 +34,4 @@ bento.sqlite-journal
 *.njsproj
 *.sln
 *.sw?
+.env

@@ -430,7 +430,7 @@ If data needs confirmation → First ask your questions, then provide the JSON a
   };
 
   // Validate and import JSON
-  const handleImport = () => {
+  const handleImport = async () => {
     setJsonError(null);
     setImportSuccess(false);
 
@@ -488,7 +488,7 @@ If data needs confirmation → First ask your questions, then provide the JSON a
       };
 
       // Import the bento
-      const newBento = importBentoFromJSON(bentoJson);
+      const newBento = await importBentoFromJSON(bentoJson);
       setImportSuccess(true);
 
       // Notify parent and close after a short delay

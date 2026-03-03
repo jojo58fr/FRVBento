@@ -15,9 +15,13 @@ import {
   Sparkles,
   Globe,
   BookOpen,
+  LogIn,
+  LogOut,
+  UserCircle,
 } from 'lucide-react';
 import BlockPreview from './BlockPreview';
 import { BlockData, BlockType } from '../types';
+import { useFrvAuth } from '../hooks/useFrvAuth';
 
 interface LandingPageProps {
   onStart: () => void;
@@ -111,6 +115,21 @@ const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/$/, '');
 
 const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
   const [isDark, setIsDark] = useState(false);
+  const {
+    enabled: authEnabled,
+    loading: authLoading,
+    user: frvUser,
+    isAuthenticated,
+    login,
+    logout,
+  } = useFrvAuth();
+  const handleCreateClick = () => {
+    if (authEnabled && !isAuthenticated) {
+      login();
+      return;
+    }
+    onStart();
+  };
   return (
     <div
       className={`min-h-screen font-sans selection:bg-black selection:text-white overflow-x-hidden ${
@@ -152,10 +171,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gray-900 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-sm">
-                FR
-              </div>
-              <span className="font-bold text-lg tracking-tight">FRVBento</span>
+              <img
+                src="/FRVtubers_VBento.png"
+                alt="FRVBento logo"
+                className="h-8 sm:h-9 w-auto"
+              />
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -171,8 +191,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
               >
                 <i className={isDark ? 'fa-solid fa-moon' : 'fa-regular fa-sun'} />
               </button>
+
               <a
-                href={`${basePath}/doc`}
+                href={`https://yoanbernabeu.github.io/openbento/doc/`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
@@ -185,11 +206,38 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
                 <span>Docs</span>
               </a>
               <button
-                onClick={onStart}
+                onClick={handleCreateClick}
                 className="bg-gray-900 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-black transition-all shadow-md hover:shadow-lg flex items-center gap-2"
               >
                 Créer mon bento <ArrowRight size={16} />
               </button>
+              
+              {authEnabled && (
+                <button
+                  type="button"
+                  onClick={isAuthenticated ? () => void logout() : login}
+                  disabled={authLoading}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all border ${
+                    isDark
+                      ? 'bg-gray-900/80 text-gray-100 border-gray-800 hover:bg-gray-800'
+                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                  }`}
+                  title={
+                    isAuthenticated
+                      ? `Connecté : ${
+                          frvUser?.displayName ||
+                          frvUser?.name ||
+                          frvUser?.username ||
+                          'Utilisateur'
+                        }`
+                      : 'Connexion FRVtubers'
+                  }
+                  aria-label={isAuthenticated ? 'Logout from FRVtubers' : 'Login with FRVtubers'}
+                >
+                  {isAuthenticated ? <LogOut size={16} /> : <LogIn size={16} />}
+                  <span>{isAuthenticated ? 'Déconnexion' : 'Connexion'}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -260,7 +308,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
           >
             <button
-              onClick={onStart}
+              onClick={handleCreateClick}
               className="group h-14 px-8 rounded-2xl bg-gray-900 text-white font-semibold text-lg flex items-center gap-3 hover:bg-black transition-all shadow-xl hover:shadow-2xl hover:scale-[1.02]"
             >
               Créer mon bento
@@ -853,7 +901,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
               Gratuit, open‑source, et pensé pour les créateurs. Publie en un clic (ou exporte si tu es en mode expert et que tu souhaites un url différent).
             </p>
             <button
-              onClick={onStart}
+              onClick={handleCreateClick}
               className="group h-16 px-10 rounded-2xl bg-gray-900 text-white font-semibold text-xl hover:bg-black transition-all shadow-2xl hover:shadow-3xl hover:scale-[1.02] inline-flex items-center gap-3"
             >
               Commencer maintenant
@@ -866,28 +914,75 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
         </div>
       </section>
 
+      {/* OpenBento Credit Section */}
+      <section className={`py-20 px-6 ${isDark ? 'bg-[#0f1117]' : 'bg-white'} border-t ${isDark ? 'border-gray-800' : 'border-gray-100'}`}>
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <div className="flex-1">
+              <span className="text-sm font-semibold uppercase tracking-wider text-violet-500">
+                OpenBento
+              </span>
+              <h2 className={`text-3xl md:text-4xl font-bold tracking-tight mt-3 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                Un moteur open‑source à soutenir
+              </h2>
+              <p className={`mt-4 text-lg ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                FRVBento est un fork d’OpenBento. Le builder, la grille bento et l’export ont été
+                créés par la communauté OpenBento. Si tu aimes l’outil, découvre le projet original
+                et soutiens son développement.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <a
+                href="https://github.com/yoanbernabeu/openbento"
+                target="_blank"
+                rel="noreferrer"
+                className={`px-5 py-3 rounded-xl font-semibold border transition-colors ${
+                  isDark
+                    ? 'border-gray-700 text-gray-100 hover:bg-gray-800'
+                    : 'border-gray-200 text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                Découvrir OpenBento
+              </a>
+              <a
+                href="https://go.yoandev.co/"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+              >
+                Découvrir ces réseaux
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className={`py-12 border-t ${isDark ? 'border-gray-800 bg-[#0f1117]' : 'border-gray-100 bg-white'}`}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gray-900 text-white rounded-lg flex items-center justify-center font-bold text-sm">
-                FR
-              </div>
-              <span className="font-semibold">FRVBento</span>
+              <img
+                src="/FRVtubers_VBento.png"
+                alt="FRVBento logo"
+                className="h-7 w-auto"
+              />
             </div>
             <div className="flex items-center gap-6 text-sm text-gray-500">
               <a
-                href={`${basePath}/doc`}
+                href={`https://yoanbernabeu.github.io/openbento/doc/`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-black transition-colors flex items-center gap-2"
+                className="hover:text-gray-400 transition-colors flex items-center gap-2"
               >
                 <BookOpen size={16} /> Docs
               </a>
-              <span className="flex items-center gap-2">
+              <a 
+                href={`https://github.com/jojo58fr/FRVBento`}
+                target="_blank"
+                className="hover:text-gray-400 flex items-center gap-2">
                 <Github size={16} /> Fork OpenBento
-              </span>
+              </a>
               <span>&copy; {new Date().getFullYear()} FRVBento</span>
             </div>
           </div>

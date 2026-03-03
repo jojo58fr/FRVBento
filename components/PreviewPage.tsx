@@ -7,12 +7,15 @@ const PreviewPage: React.FC = () => {
   const [bento, setBento] = useState<SavedBento | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const requestedId = params.get('id')?.trim();
-    const requested = requestedId ? getBento(requestedId) : null;
-    const resolved = requested || getOrCreateActiveBento();
-    if (requested) setActiveBentoId(requested.id);
-    setBento(resolved);
+    const load = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const requestedId = params.get('id')?.trim();
+      const requested = requestedId ? await getBento(requestedId) : null;
+      const resolved = requested || (await getOrCreateActiveBento());
+      if (requested) setActiveBentoId(requested.id);
+      setBento(resolved);
+    };
+    void load();
   }, []);
 
   if (!bento) {

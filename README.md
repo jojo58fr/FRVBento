@@ -82,6 +82,17 @@ Même avec une solution hébergée, l’objectif est de **laisser le contrôle a
 - TypeScript
 - Tailwind CSS
 
+### Backend (URL + sauvegarde)
+
+- Next.js API routes
+- Prisma + SQLite (fichier local)
+
+Initialisation locale (une seule fois) :
+
+```bash
+npx prisma migrate dev --name init
+```
+
 ### Plateforme (fork)
 
 - Backend pour la gestion des utilisateurs

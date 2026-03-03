@@ -25,7 +25,11 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
   // Load bentos when dropdown opens
   useEffect(() => {
     if (isOpen) {
-      setBentos(getAllBentos());
+      const load = async () => {
+        const items = await getAllBentos();
+        setBentos(items);
+      };
+      void load();
     }
   }, [isOpen]);
 
@@ -50,13 +54,16 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleCreateBento = () => {
-    if (newName.trim()) {
-      const newBento = createBento(newName.trim());
+  const handleCreateBento = async () => {
+    if (!newName.trim()) return;
+    try {
+      const newBento = await createBento(newName.trim());
       onBentoChange(newBento);
       setIsCreating(false);
       setNewName('');
       setIsOpen(false);
+    } catch {
+      // ignore for now
     }
   };
 
@@ -69,7 +76,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
     }
   };
 
-  const handleDeleteBento = (e: React.MouseEvent, bentoId: string) => {
+  const handleDeleteBento = async (e: React.MouseEvent, bentoId: string) => {
     e.stopPropagation();
 
     const bentoToDelete = bentos.find((b) => b.id === bentoId);
@@ -78,18 +85,22 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
     const confirmDelete = window.confirm(`Delete "${bentoToDelete.name}"? This cannot be undone.`);
     if (!confirmDelete) return;
 
-    deleteBento(bentoId);
-    const updatedBentos = getAllBentos();
-    setBentos(updatedBentos);
+    try {
+      await deleteBento(bentoId);
+      const updatedBentos = await getAllBentos();
+      setBentos(updatedBentos);
 
-    // If we deleted the active bento, switch to another one
-    if (bentoId === activeBentoId && updatedBentos.length > 0) {
-      onBentoChange(updatedBentos[0]);
-    } else if (updatedBentos.length === 0) {
-      // If no bentos left, create a new one
-      const newBento = createBento('My Bento');
-      onBentoChange(newBento);
-      setIsOpen(false);
+      // If we deleted the active bento, switch to another one
+      if (bentoId === activeBentoId && updatedBentos.length > 0) {
+        onBentoChange(updatedBentos[0]);
+      } else if (updatedBentos.length === 0) {
+        // If no bentos left, create a new one
+        const newBento = await createBento('My Bento');
+        onBentoChange(newBento);
+        setIsOpen(false);
+      }
+    } catch {
+      // ignore for now
     }
   };
 
@@ -179,9 +190,18 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
                         >
                           {bento.name}
                         </p>
-                        <p className="text-xs text-gray-400">
-                          Updated {formatDate(bento.updatedAt)}
-                        </p>
+                        <div className="text-xs text-gray-400 flex items-center gap-2">
+                          <span>Updated {formatDate(bento.updatedAt)}</span>
+                          {bento.publishedSlug ? (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-semibold">
+                              Publié
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-100 text-[10px] font-semibold">
+                              Brouillon
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {bento.id === activeBentoId && (
                         <Check size={16} className="text-blue-500 shrink-0" />

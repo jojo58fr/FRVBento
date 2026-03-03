@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Bento {
+  id        String         @id
+  data      Json
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  ownerId   String?
+  owner     User?          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  published PublishedBento?
+}
+
+model User {
+  id          String  @id
+  discordId   String? @unique
+  username    String?
+  displayName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  bentos      Bento[]
+}
+
+model PublishedBento {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique
+  bentoId   String   @unique
+  bento     Bento    @relation(fields: [bentoId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

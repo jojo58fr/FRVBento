@@ -105,6 +105,7 @@ export interface UserProfile {
   avatarStyle?: AvatarStyle; // Profile picture style options
   theme: 'light' | 'dark';
   primaryColor: string;
+  customCss?: string;
   publicSlug?: string;
   showBranding?: boolean;
   showSocialInHeader?: boolean; // Show social icons row under name/bio
@@ -136,4 +137,5 @@ export interface SavedBento {
   createdAt: number;
   updatedAt: number;
   data: SiteData;
+  publishedSlug?: string | null;
 }
