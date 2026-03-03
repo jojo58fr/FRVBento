@@ -141,10 +141,10 @@ export const useFrvAuth = () => {
       return;
     }
     const baseUrl = authOrigin.replace(/\/$/, '');
-    const callbackUrl =
-      callbackBaseUrl || (typeof window !== 'undefined' ? window.location.href : '');
+    //const callbackUrl =
+    //  callbackBaseUrl || (typeof window !== 'undefined' ? window.location.href : '');
     const url = `${baseUrl}/api/auth/signin/discord?callbackUrl=${encodeURIComponent(
-      callbackUrl
+      callbackBaseUrl
     )}`;
     window.location.href = url;
   }, [authOrigin, callbackBaseUrl]);
