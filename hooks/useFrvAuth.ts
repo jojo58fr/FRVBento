@@ -23,6 +23,46 @@ const getAuthOrigin = () => process.env.NEXT_PUBLIC_FRVTUBERS_AUTH_ORIGIN?.trim(
 const getCallbackBaseUrl = () =>
   process.env.NEXT_PUBLIC_FRVSTREAM_CALLBACK_URL?.trim() || '';
 
+const readCookie = (name: string) => {
+  if (typeof document === 'undefined') return null;
+  const cookies = document.cookie ? document.cookie.split('; ') : [];
+  for (const cookie of cookies) {
+    if (!cookie.startsWith(`${name}=`)) continue;
+    const value = cookie.slice(name.length + 1);
+    return decodeURIComponent(value);
+  }
+  return null;
+};
+
+const readCsrfTokenFromCookie = () => {
+  const candidate =
+    readCookie('__Host-next-auth.csrf-token') ??
+    readCookie('next-auth.csrf-token') ??
+    readCookie('csrfToken') ??
+    readCookie('csrf-token');
+  if (!candidate) return null;
+  const token = candidate.split('|')[0];
+  return token || null;
+};
+
+const submitHiddenForm = (action: string, fields: Record<string, string>) => {
+  if (typeof document === 'undefined') return;
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = action;
+  form.style.display = 'none';
+  Object.entries(fields).forEach(([key, value]) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = key;
+    input.value = value;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+};
+
 export const useFrvAuth = () => {
   const authOrigin = getAuthOrigin();
   const apiBaseUrl = getApiBaseUrl();
@@ -109,51 +149,73 @@ export const useFrvAuth = () => {
     window.location.href = url;
   }, [authOrigin, callbackBaseUrl]);
 
+  const requestLogout = useCallback(async () => {
+    if (!authOrigin) return 0;
+    const baseUrl = authOrigin.replace(/\/$/, '');
+    const callbackUrl =
+      callbackBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+    const sameOrigin =
+      typeof window !== 'undefined' && window.location.origin === authOrigin;
+
+    if (!sameOrigin) {
+      const csrfToken = readCsrfTokenFromCookie();
+      if (csrfToken) {
+        submitHiddenForm(`${baseUrl}/api/auth/signout`, {
+          csrfToken,
+          callbackUrl,
+        });
+        return 1;
+      }
+      if (typeof window !== 'undefined') {
+        window.location.href = `${baseUrl}/api/auth/signout?callbackUrl=${encodeURIComponent(
+          callbackUrl
+        )}`;
+        return 1;
+      }
+      return 0;
+    }
+
+    const csrfRes = await fetch(`${baseUrl}/api/auth/csrf`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    });
+    const csrfData = await csrfRes.json().catch(() => null);
+    const csrfToken = csrfData?.csrfToken;
+    if (!csrfToken) {
+      throw new Error('Failed to fetch CSRF token');
+    }
+    const res = await fetch(`${baseUrl}/api/auth/signout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        csrfToken,
+        callbackUrl,
+        redirect: false,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error('Failed to logout');
+    }
+    return 1;
+  }, [authOrigin, callbackBaseUrl]);
+
   const logout = useCallback(async () => {
     if (!authOrigin) return;
     setLoading(true);
     setError(null);
     try {
-      const baseUrl = authOrigin.replace(/\/$/, '');
-      const callbackUrl =
-        callbackBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
-      const sameOrigin =
-        typeof window !== 'undefined' && window.location.origin === authOrigin;
-
-      // Cross-origin: avoid CORS by doing a full redirect to the auth origin
-      if (!sameOrigin) {
-        window.location.href = `${baseUrl}/api/auth/signout?callbackUrl=${encodeURIComponent(
-          callbackUrl
-        )}`;
-        return;
+      const ok = await requestLogout();
+      if (ok === 1) {
+        setSession(null);
       }
-
-      const csrfRes = await fetch(`${baseUrl}/api/auth/csrf`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: { Accept: 'application/json' },
-      });
-      const csrfData = await csrfRes.json().catch(() => null);
-      const csrfToken = csrfData?.csrfToken;
-      if (!csrfToken) {
-        throw new Error('Failed to fetch CSRF token');
-      }
-      const body = new URLSearchParams();
-      body.set('csrfToken', csrfToken);
-      body.set('callbackUrl', callbackUrl);
-      await fetch(`${baseUrl}/api/auth/signout`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-      });
-      setSession(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to logout');
     } finally {
       setLoading(false);
     }
-  }, [authOrigin, callbackBaseUrl]);
+  }, [authOrigin, requestLogout]);
 
   useEffect(() => {
     if (!enabled) {
