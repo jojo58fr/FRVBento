@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import type { Prisma } from '@prisma/client';
 import type { SavedBento, SiteData, BlockData, UserProfile } from '../../types';
 import { AVATAR_PLACEHOLDER } from '../../constants';
 import { prisma } from './prisma';
@@ -189,7 +190,7 @@ export const createBentoForOwner = async (
     data: {
       id: sanitized.id,
       ownerId: owner.id,
-      data: sanitized,
+      data: sanitized as unknown as Prisma.InputJsonValue,
     },
     include: { published: true },
   });
@@ -207,7 +208,7 @@ export const createBentoFromJsonForOwner = async (
     data: {
       id: sanitized.id,
       ownerId: owner.id,
-      data: sanitized,
+      data: sanitized as unknown as Prisma.InputJsonValue,
     },
     include: { published: true },
   });
@@ -222,7 +223,7 @@ export const updateBentoForOwner = async (
   const existing = await prisma.bento.findFirst({ where: { id, ownerId } });
   if (!existing) return null;
 
-  const current = existing.data as SavedBento;
+  const current = existing.data as unknown as SavedBento;
   const now = Date.now();
   const next: SavedBento = {
     ...current,
@@ -236,7 +237,7 @@ export const updateBentoForOwner = async (
   const sanitized = sanitizeBento(next);
   const saved = await prisma.bento.update({
     where: { id },
-    data: { data: sanitized },
+    data: { data: sanitized as unknown as Prisma.InputJsonValue },
     include: { published: true },
   });
   return mapBentoRecord(saved);
@@ -266,7 +267,7 @@ export const getBentoByUsername = async (username: string): Promise<BentoRecord 
   }
   return {
     username: published.slug,
-    bento: published.bento.data as SavedBento,
+    bento: published.bento.data as unknown as SavedBento,
     createdAt: published.createdAt.getTime(),
     updatedAt: published.bento.updatedAt.getTime(),
   };
@@ -298,10 +299,10 @@ export const saveBentoForUsername = async (
 
   const savedBento = await prisma.bento.upsert({
     where: { id: resolvedId },
-    update: { data: normalized },
+    update: { data: normalized as unknown as Prisma.InputJsonValue },
     create: {
       id: resolvedId,
-      data: normalized,
+      data: normalized as unknown as Prisma.InputJsonValue,
       ownerId: ownerId || existingBento?.ownerId || 'public',
     },
   });
@@ -323,7 +324,7 @@ export const saveBentoForUsername = async (
 
   return {
     username: published.slug,
-    bento: savedBento.data as SavedBento,
+    bento: savedBento.data as unknown as SavedBento,
     createdAt: published.createdAt.getTime(),
     updatedAt: savedBento.updatedAt.getTime(),
   };

@@ -2586,7 +2586,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         onExportJson={handleExportJSON}
         onImportJson={handleImportJSON}
         blocks={blocks}
-        setBlocks={handleSetBlocks}
+        onBlocksChange={handleSetBlocks}
       />
 
       {/* 4. AVATAR CROP MODAL */}

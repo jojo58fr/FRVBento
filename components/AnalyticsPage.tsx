@@ -34,6 +34,7 @@ type AnalyticsEvent = {
   language: string | null;
   screen_w: number | null;
   screen_h: number | null;
+  viewport_w: number | null;
   visitor_id: string | null;
   session_id: string | null;
   duration_seconds: number | null;

@@ -45,7 +45,7 @@ const demoBlocks: BlockData[] = [
   },
   {
     id: 'demo-2',
-    type: BlockType.YOUTUBE,
+    type: BlockType.SOCIAL,
     title: 'YouTube',
     subtext: 'Latest cover',
     content: 'https://www.youtube.com',
@@ -55,6 +55,8 @@ const demoBlocks: BlockData[] = [
     gridRow: 1,
     color: 'bg-red-500',
     textColor: 'text-white',
+    socialPlatform: 'youtube',
+    socialHandle: 'frv_vtuber',
   },
   {
     id: 'demo-3',
@@ -722,7 +724,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-end">
                     <div>
-                      <p className="text-3xl font-bold text-gray-900">3 214</p>
+                      <p className="text-3xl font-bold text-gray-900">3 214</p>
                       <p className="text-sm text-gray-500">Vues</p>
                     </div>
                     <div className="text-right">
