@@ -7,6 +7,7 @@ export const generateTypes = (): string => `
 enum BlockType {
   LINK = 'LINK',
   TEXT = 'TEXT',
+  FLUID_TEXT = 'FLUID_TEXT',
   MEDIA = 'MEDIA',
   SOCIAL = 'SOCIAL',
   SOCIAL_ICON = 'SOCIAL_ICON',
@@ -29,6 +30,7 @@ interface BlockData {
   color?: string
   customBackground?: string
   textColor?: string
+  fluidTextFontSize?: number
   gridColumn?: number
   gridRow?: number
   channelId?: string

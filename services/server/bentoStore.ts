@@ -101,23 +101,35 @@ const loadDefaultTemplate = async (): Promise<BentoTemplate | null> => {
   }
 };
 
+const applyUserUpdates = async (
+  user: FrvUserIdentity,
+  existing: {
+    id: string;
+    discordId: string | null;
+    username: string | null;
+    displayName: string | null;
+  }
+) => {
+  const updates: Record<string, string | null> = {};
+  if (user.discordId && !existing.discordId) {
+    const conflict = await prisma.user.findUnique({ where: { discordId: user.discordId } });
+    if (!conflict) updates.discordId = user.discordId;
+  }
+  if (user.username && user.username !== existing.username) updates.username = user.username;
+  if (user.displayName && user.displayName !== existing.displayName) {
+    updates.displayName = user.displayName;
+  }
+  if (Object.keys(updates).length > 0) {
+    await prisma.user.update({ where: { id: existing.id }, data: updates });
+  }
+  return existing;
+};
+
 const ensureUser = async (user: FrvUserIdentity) => {
   const existing = await prisma.user.findUnique({ where: { id: user.id } });
 
   if (existing) {
-    const updates: Record<string, string | null> = {};
-    if (user.discordId && !existing.discordId) {
-      const conflict = await prisma.user.findUnique({ where: { discordId: user.discordId } });
-      if (!conflict) updates.discordId = user.discordId;
-    }
-    if (user.username && user.username !== existing.username) updates.username = user.username;
-    if (user.displayName && user.displayName !== existing.displayName) {
-      updates.displayName = user.displayName;
-    }
-    if (Object.keys(updates).length > 0) {
-      await prisma.user.update({ where: { id: user.id }, data: updates });
-    }
-    return existing;
+    return applyUserUpdates(user, existing);
   }
 
   const createData: {
@@ -136,7 +148,17 @@ const ensureUser = async (user: FrvUserIdentity) => {
     if (!conflict) createData.discordId = user.discordId;
   }
 
-  return prisma.user.create({ data: createData });
+  try {
+    return await prisma.user.create({ data: createData });
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error as { code?: string }).code === 'P2002') {
+      const fallback = await prisma.user.findUnique({ where: { id: user.id } });
+      if (fallback) {
+        return applyUserUpdates(user, fallback);
+      }
+    }
+    throw error;
+  }
 };
 
 const mapBentoRecord = (record: {

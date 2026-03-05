@@ -142,6 +142,15 @@ const Block = ({ block }: { block: BlockData }) => {
                 src={\`https://maps.google.com/maps?q=\${encodeURIComponent(block.content || 'Paris')}&t=&z=13&ie=UTF8&iwloc=&output=embed\`} loading="lazy" sandbox="allow-scripts allow-same-origin" />
               {block.title && <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent"><p className="font-semibold text-white text-sm">{block.title}</p></div>}
             </div>
+          ) : block.type === BlockType.FLUID_TEXT ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <span
+                className="font-black tracking-tight"
+                style={{ fontSize: \`\${Math.round((block.fluidTextFontSize ?? 0.33) * 100)}%\` }}
+              >
+                {block.title || 'Text'}
+              </span>
+            </div>
           ) : isRichYT ? (
             <div className="w-full h-full relative">
               <div className="absolute inset-0 flex items-center justify-center">
