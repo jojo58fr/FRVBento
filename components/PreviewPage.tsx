@@ -7,6 +7,10 @@ import { getMobileLayout, MOBILE_GRID_CONFIG } from '../utils/mobileLayout';
 
 const PreviewPage: React.FC = () => {
   const [bento, setBento] = useState<SavedBento | null>(null);
+  const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return window.innerWidth >= 1024;
+  });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -15,6 +19,18 @@ const PreviewPage: React.FC = () => {
     const resolved = requested || getOrCreateActiveBento();
     if (requested) setActiveBentoId(requested.id);
     setBento(resolved);
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsDesktop(media.matches);
+    update();
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', update);
+      return () => media.removeEventListener('change', update);
+    }
+    media.addListener(update);
+    return () => media.removeListener(update);
   }, []);
 
   // Avatar style helpers
@@ -117,7 +133,7 @@ const PreviewPage: React.FC = () => {
 
       <div className="relative z-10">
         {/* Desktop Layout - Matches Builder */}
-        <div className="hidden lg:flex">
+        {isDesktop && <div className="flex">
           {/* Fixed Sidebar */}
           <div className="fixed left-0 top-0 w-[420px] h-screen flex flex-col justify-center items-start px-12 z-10">
             <div className="flex flex-col items-start text-left">
@@ -176,10 +192,10 @@ const PreviewPage: React.FC = () => {
               ))}
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* Mobile Layout - Matches Builder mobile preview */}
-        <div className="lg:hidden">
+        {!isDesktop && <div>
           {/* Centered Profile */}
           <div className="p-4 pt-8 flex flex-col items-center text-center">
             <div className="w-24 h-24 mb-4 overflow-hidden bg-gray-100" style={avatarStyle}>
@@ -276,7 +292,7 @@ const PreviewPage: React.FC = () => {
               })}
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* Footer */}
         {profile.showBranding !== false && (
