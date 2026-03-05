@@ -6,6 +6,12 @@ import {
 } from '../../../services/server/bentoStore';
 import { resolveFrvUserFromRequest } from '../../../services/server/frvAuthUser';
 
+export const config = {
+  api: {
+    bodyParser: { sizeLimit: '50mb' },
+  },
+};
+
 const requireAuth = !!(
   process.env.FRVTUBERS_AUTH_ORIGIN?.trim() || process.env.FRVTUBERS_API_BASE_URL?.trim()
 );
