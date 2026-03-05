@@ -64,6 +64,14 @@ const removeCacheItem = (id: string): void => {
 const fetchJson = async <T>(input: RequestInfo, init?: RequestInit): Promise<T> => {
   const res = await fetch(input, init);
   if (!res.ok) {
+    if (res.status === 413) {
+      throw new Error(
+        'Bento trop lourd (images/base64). Réduis ou compresse les images, ou utilise des URLs.'
+      );
+    }
+    if (res.status === 401) {
+      throw new Error('Non connecté. Connecte-toi pour sauvegarder ton bento.');
+    }
     const errorText = await res.text().catch(() => '');
     throw new Error(errorText || `Request failed (${res.status})`);
   }

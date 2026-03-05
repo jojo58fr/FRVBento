@@ -279,6 +279,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handleRawJsonImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === 'string' ? reader.result : '';
+      setJsonText(text);
+      setJsonError(null);
+    };
+    reader.onerror = () => {
+      setJsonError('Impossible de lire le fichier JSON.');
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: 'general', label: 'General', icon: <User size={16} /> },
     { id: 'social', label: 'Social', icon: <Share2 size={16} /> },
@@ -1593,14 +1609,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         Edit the JSON directly. Be careful!
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      aria-label="Apply JSON changes"
-                      onClick={handleJsonSave}
-                      className="px-4 py-2 bg-violet-600 text-white rounded-lg text-xs font-semibold hover:bg-violet-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                    >
-                      Apply Changes
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <label className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
+                        Import JSON
+                        <input
+                          type="file"
+                          accept=".json,application/json"
+                          aria-label="Import raw JSON file"
+                          onChange={handleRawJsonImport}
+                          className="hidden"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        aria-label="Apply JSON changes"
+                        onClick={handleJsonSave}
+                        className="px-4 py-2 bg-violet-600 text-white rounded-lg text-xs font-semibold hover:bg-violet-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      >
+                        Apply Changes
+                      </button>
+                    </div>
                   </div>
 
                   {jsonError && (
