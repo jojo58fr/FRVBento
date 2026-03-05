@@ -18,13 +18,23 @@ export interface ImageMap {
 export function extractImages(data: SiteData, assetsFolder: JSZip | null): ImageMap {
   const imageMap: ImageMap = {};
 
+  const getExtension = (dataUrl: string): string => {
+    const match = dataUrl.match(/^data:image\/([^;]+);base64,/);
+    const ext = match?.[1]?.toLowerCase() || 'png';
+    if (ext === 'jpeg') return 'jpg';
+    if (ext === 'svg+xml') return 'svg';
+    return ext;
+  };
+
   // Extract avatar if it's a base64 image
   const avatarSrc = resolveImageSrc(data.profile.avatarUrl);
   if (avatarSrc?.startsWith('data:image')) {
     const blob = base64ToBlob(avatarSrc);
     if (blob && assetsFolder) {
-      assetsFolder.file('avatar.png', blob);
-      imageMap['profile_avatar'] = '/assets/avatar.png';
+      const ext = getExtension(avatarSrc);
+      const filename = `avatar.${ext}`;
+      assetsFolder.file(filename, blob);
+      imageMap['profile_avatar'] = `/assets/${filename}`;
     }
   }
 
@@ -34,7 +44,8 @@ export function extractImages(data: SiteData, assetsFolder: JSZip | null): Image
     if (blockImageSrc?.startsWith('data:image')) {
       const blob = base64ToBlob(blockImageSrc);
       if (blob && assetsFolder) {
-        const filename = `block-${block.id}.png`;
+        const ext = getExtension(blockImageSrc);
+        const filename = `block-${block.id}.${ext}`;
         assetsFolder.file(filename, blob);
         imageMap[`block_${block.id}`] = `/assets/${filename}`;
       }

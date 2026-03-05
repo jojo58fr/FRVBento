@@ -78,6 +78,8 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
             updateBlock({ ...editingBlock, imageUrl: image });
             if (notices.length > 0) {
               const parts: string[] = [];
+              if (notices.includes('animated-webp')) parts.push('GIF converti en WebP animé');
+              if (notices.includes('gif')) parts.push('GIF conservé');
               if (notices.includes('compressed')) parts.push('Image compressée');
               if (notices.includes('chunked'))
                 parts.push('Image grande, sauvegardée en plusieurs morceaux pour l’export');

@@ -81,6 +81,38 @@ export const normalizeImageToWebp = async (
   if (!dataUrl.startsWith('data:image')) {
     throw new Error('Unsupported image format');
   }
+  if (dataUrl.startsWith('data:image/gif')) {
+    try {
+      const response = await fetch('/api/images/animated-webp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dataUrl,
+          maxWidth: MAX_WIDTH,
+          maxHeight: MAX_HEIGHT,
+          maxBytes: MAX_FILE_BYTES,
+        }),
+      });
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(text || 'Animated WebP conversion failed');
+      }
+      const payload = (await response.json()) as {
+        dataUrl?: string;
+        didResize?: boolean;
+        didAdjustQuality?: boolean;
+      };
+      if (!payload.dataUrl) throw new Error('Animated WebP conversion failed');
+      return {
+        dataUrl: payload.dataUrl,
+        didResize: payload.didResize ?? false,
+        didAdjustQuality: payload.didAdjustQuality ?? false,
+      };
+    } catch (error) {
+      console.warn('Animated WebP conversion failed, keeping GIF.', error);
+      return { dataUrl, didResize: false, didAdjustQuality: false };
+    }
+  }
 
   const img = await loadImage(dataUrl);
   const { width, height, didResize } = fitWithin(img.width, img.height, MAX_WIDTH, MAX_HEIGHT);
@@ -109,16 +141,31 @@ export const normalizeImageToWebp = async (
 export const prepareImageData = async (
   dataUrl: string
 ): Promise<{ image: ImageData; notices: string[] }> => {
-  const { dataUrl: webp, didResize, didAdjustQuality } = await normalizeImageToWebp(dataUrl);
+  const isGif = dataUrl.startsWith('data:image/gif');
+  const { dataUrl: normalized, didResize, didAdjustQuality } = await normalizeImageToWebp(dataUrl);
+  const isAnimatedWebp = isGif && normalized.startsWith('data:image/webp');
 
-  if (webp.length > MAX_TOTAL_BYTES) {
+  if (normalized.length > MAX_TOTAL_BYTES) {
     throw new Error('Image trop lourde après compression');
   }
 
   const notices: string[] = [];
-  if (didResize || didAdjustQuality) notices.push('compressed');
+  if (isAnimatedWebp) {
+    notices.push('animated-webp');
+  } else if (isGif) {
+    notices.push('gif');
+  } else if (didResize || didAdjustQuality) {
+    notices.push('compressed');
+  }
+  if (
+    (didResize || didAdjustQuality) &&
+    !notices.includes('compressed') &&
+    (!isGif || isAnimatedWebp)
+  ) {
+    notices.push('compressed');
+  }
 
-  const image = chunkDataUrl(webp);
+  const image = chunkDataUrl(normalized);
   if (image.kind === 'chunked') notices.push('chunked');
 
   return { image, notices };
