@@ -1,4 +1,5 @@
 import { SavedBento, SiteData, BlockData, UserProfile } from '../types';
+import { resolveImageSrc } from '../utils/imageData';
 
 const CACHE_KEY = 'frvbento_bentos_cache';
 const ACTIVE_BENTO_KEY = 'frvbento_active_bento';
@@ -204,6 +205,19 @@ export const initializeApp = async (): Promise<SavedBento> => {
 };
 
 export const updateBentoData = async (id: string, data: SiteData): Promise<SavedBento | null> => {
+  const result = await updateBentoDataWithResult(id, data);
+  return result.bento;
+};
+
+export interface UpdateBentoResult {
+  bento: SavedBento | null;
+  error?: string;
+}
+
+export const updateBentoDataWithResult = async (
+  id: string,
+  data: SiteData
+): Promise<UpdateBentoResult> => {
   try {
     const res = await fetchJson<{ ok: boolean; bento: SavedBento }>(
       `/api/bentos/${encodeURIComponent(id)}`,
@@ -214,9 +228,11 @@ export const updateBentoData = async (id: string, data: SiteData): Promise<Saved
       }
     );
     updateCacheItem(res.bento);
-    return res.bento;
-  } catch {
-    return null;
+    return { bento: res.bento };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Request failed';
+    console.error('updateBentoData failed:', { id, message, error });
+    return { bento: null, error: message };
   }
 };
 
@@ -240,12 +256,26 @@ export const renameBento = async (id: string, newName: string): Promise<SavedBen
 // ============ EXPORT / IMPORT ============
 
 export const exportBentoToJSON = (bento: SavedBento): BentoJSON => {
+  const profile = bento.data.profile;
+  const normalizedProfile: UserProfile = {
+    ...profile,
+    avatarUrl: resolveImageSrc(profile.avatarUrl) || '',
+    backgroundImage: resolveImageSrc(profile.backgroundImage),
+    openGraph: profile.openGraph
+      ? { ...profile.openGraph, image: resolveImageSrc(profile.openGraph.image) }
+      : undefined,
+  };
+  const normalizedBlocks: BlockData[] = bento.data.blocks.map((block) => ({
+    ...block,
+    imageUrl: resolveImageSrc(block.imageUrl),
+  }));
+
   return {
     id: bento.id,
     name: bento.name,
     version: '1.0',
-    profile: bento.data.profile,
-    blocks: bento.data.blocks,
+    profile: normalizedProfile,
+    blocks: normalizedBlocks,
     gridVersion: bento.data.gridVersion ?? GRID_VERSION,
     exportedAt: Date.now(),
   };

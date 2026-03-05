@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import QRCode from 'qrcode';
-import { UserProfile, BlockData, BlockType, SavedBento, AvatarStyle } from '../types';
+import { UserProfile, BlockData, BlockType, SavedBento, AvatarStyle, ImageData } from '../types';
 import Block from './Block';
 import EditorSidebar from './EditorSidebar';
 import ProfileDropdown from './ProfileDropdown';
@@ -15,6 +15,7 @@ import { exportSite, type ExportDeploymentTarget } from '../services/export';
 import {
   initializeApp,
   updateBentoData,
+  updateBentoDataWithResult,
   setActiveBentoId,
   downloadBentoJSON,
   loadBentoFromFile,
@@ -23,6 +24,7 @@ import {
 } from '../services/storageService';
 import { getSocialPlatformOption, buildSocialUrl, formatFollowerCount } from '../socialPlatforms';
 import { getMobileLayout, MOBILE_GRID_CONFIG } from '../utils/mobileLayout';
+import { getImageDataUrlLength, prepareImageData, resolveImageSrc } from '../utils/imageData';
 import {
   Download,
   Layout,
@@ -496,6 +498,18 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     setSaved,
     setError,
   } = useSaveStatus();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [avatarNotice, setAvatarNotice] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!avatarNotice && !avatarError) return;
+    const timer = window.setTimeout(() => {
+      setAvatarNotice(null);
+      setAvatarError(null);
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [avatarNotice, avatarError]);
   const {
     enabled: authEnabled,
     loading: authLoading,
@@ -636,14 +650,52 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       if (!activeBento) return;
 
       setSaving();
+      setSaveError(null);
+
+      const imageStats = (() => {
+        let dataUrlCount = 0;
+        let totalDataUrlChars = 0;
+        let maxDataUrlChars = 0;
+
+        const track = (value?: string | null | ImageData) => {
+          if (!value) return;
+          const isDataUrl = typeof value === 'string' ? value.startsWith('data:image') : true;
+          if (!isDataUrl) return;
+          const size = getImageDataUrlLength(value);
+          dataUrlCount += 1;
+          totalDataUrlChars += size;
+          maxDataUrlChars = Math.max(maxDataUrlChars, size);
+        };
+
+        track(newProfile.avatarUrl);
+        track(newProfile.backgroundImage);
+        track(newProfile.openGraph?.image);
+
+        for (const block of newBlocks) {
+          track(block.imageUrl);
+        }
+
+        return { dataUrlCount, totalDataUrlChars, maxDataUrlChars };
+      })();
+
+      const payloadChars = JSON.stringify({
+        data: { profile: newProfile, blocks: newBlocks, gridVersion },
+      }).length;
+
+      console.info('[save] saving', {
+        bentoId: activeBento.id,
+        blockCount: newBlocks.length,
+        payloadChars,
+        ...imageStats,
+      });
 
       try {
-        const saved = await updateBentoData(activeBento.id, {
+        const result = await updateBentoDataWithResult(activeBento.id, {
           profile: newProfile,
           blocks: newBlocks,
           gridVersion,
         });
-        if (!saved) throw new Error('Save failed');
+        if (!result.bento) throw new Error(result.error || 'Save failed');
 
         if (newProfile.publicSlug && canPublishPublicUrl) {
           const currentBento: SavedBento = {
@@ -657,9 +709,14 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
 
         setTimeout(() => {
           setSaved();
+          setSaveError(null);
         }, 300);
-      } catch {
+        console.info('[save] saved', { bentoId: activeBento.id });
+      } catch (error) {
         setError();
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        setSaveError(message);
+        console.error('[save] failed', { bentoId: activeBento.id, message, error });
       }
     },
     [
@@ -668,6 +725,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       setSaving,
       setSaved,
       setError,
+      setSaveError,
       schedulePublishedSync,
       canPublishPublicUrl,
     ]
@@ -1693,24 +1751,27 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     );
   }
 
-  if (!profile) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    if (!profile) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+
+    const avatarSrc = resolveImageSrc(profile.avatarUrl);
+    const backgroundSrc = resolveImageSrc(profile.backgroundImage);
 
   // Background style from profile settings
-  const backgroundStyle: React.CSSProperties = profile.backgroundImage
-    ? {
-        backgroundImage: `url(${profile.backgroundImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed',
-      }
-    : profile.backgroundColor
-      ? { backgroundColor: profile.backgroundColor }
-      : { backgroundColor: isDark ? '#0b0b0f' : '#f9fafb' }; // default
+    const backgroundStyle: React.CSSProperties = backgroundSrc
+      ? {
+          backgroundImage: `url(${backgroundSrc})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
+        }
+      : profile.backgroundColor
+        ? { backgroundColor: profile.backgroundColor }
+        : { backgroundColor: isDark ? '#0b0b0f' : '#f9fafb' }; // default
 
   return (
     <div className="min-h-screen flex font-sans overflow-x-hidden relative" style={backgroundStyle}>
       {/* Background blur overlay */}
-      {profile.backgroundImage && profile.backgroundBlur && profile.backgroundBlur > 0 && (
+        {backgroundSrc && profile.backgroundBlur && profile.backgroundBlur > 0 && (
         <div
           className="absolute inset-0 z-0"
           style={{
@@ -1756,7 +1817,11 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                 onClick={handleManualSave}
                 disabled={saveStatus === 'saving'}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 disabled:opacity-50"
-                title="Save (Ctrl+S)"
+                  title={
+                    saveStatus === 'error' && saveError
+                      ? `Save error: ${saveError}`
+                      : 'Save (Ctrl+S)'
+                  }
               >
                 {saveStatus === 'saving' ? (
                   <>
@@ -1954,9 +2019,9 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                   className={getAvatarContainerClasses(profile.avatarStyle)}
                   style={getAvatarContainerStyle(profile.avatarStyle)}
                 >
-                  {profile.avatarUrl ? (
+                  {avatarSrc ? (
                     <img
-                      src={profile.avatarUrl}
+                      src={avatarSrc}
                       alt={profile.name}
                       className={getAvatarClasses(profile.avatarStyle)}
                     />
@@ -2002,6 +2067,13 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                   onChange={handleAvatarUpload}
                   className="hidden"
                 />
+                {(avatarNotice || avatarError) && (
+                  <div
+                    className={`mt-2 text-xs ${avatarError ? 'text-red-600' : 'text-emerald-600'}`}
+                  >
+                    {avatarError || avatarNotice}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 w-full max-w-xs">
@@ -2149,9 +2221,9 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                       : 'none';
 
                   // Background style
-                  const bgStyle = profile.backgroundImage
+                  const bgStyle = backgroundSrc
                     ? {
-                        backgroundImage: `url('${profile.backgroundImage}')`,
+                        backgroundImage: `url('${backgroundSrc}')`,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                       }
@@ -2165,9 +2237,9 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                         style={bgStyle}
                       >
                         {/* Background blur overlay */}
-                        {profile.backgroundImage &&
-                          profile.backgroundBlur &&
-                          profile.backgroundBlur > 0 && (
+                          {backgroundSrc &&
+                            profile.backgroundBlur &&
+                            profile.backgroundBlur > 0 && (
                             <div
                               className="absolute inset-0 pointer-events-none"
                               style={{
@@ -2187,7 +2259,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                             }}
                           >
                             <img
-                              src={profile.avatarUrl}
+                              src={avatarSrc}
                               alt="Avatar"
                               className="w-full h-full object-cover"
                             />
@@ -2598,12 +2670,31 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
           setShowAvatarCropModal(false);
           setPendingAvatarSrc(null);
         }}
-        onConfirm={(dataUrl) => {
-          handleSetProfile((prev) => ({ ...prev, avatarUrl: dataUrl }));
-          setShowAvatarCropModal(false);
-          setPendingAvatarSrc(null);
-        }}
-      />
+          onConfirm={(dataUrl) => {
+            void (async () => {
+              try {
+                setAvatarError(null);
+                const { image, notices } = await prepareImageData(dataUrl);
+                handleSetProfile((prev) => ({ ...prev, avatarUrl: image }));
+                if (notices.length > 0) {
+                  const parts: string[] = [];
+                  if (notices.includes('compressed')) parts.push('Image compressée');
+                  if (notices.includes('chunked'))
+                    parts.push('Image grande, sauvegardée en plusieurs morceaux pour l’export');
+                  setAvatarNotice(parts.join(' · '));
+                } else {
+                  setAvatarNotice(null);
+                }
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Image invalide';
+                setAvatarError(message);
+              } finally {
+                setShowAvatarCropModal(false);
+                setPendingAvatarSrc(null);
+              }
+            })();
+          }}
+        />
 
       {/* 5. AVATAR STYLE MODAL */}
       <AvatarStyleModal

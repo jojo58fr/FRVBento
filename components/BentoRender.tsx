@@ -1,5 +1,6 @@
 import React from 'react';
 import type { AvatarStyle, SavedBento, BlockData } from '../types';
+import { resolveImageSrc } from '../utils/imageData';
 import Block from './Block';
 import { buildSocialUrl, formatFollowerCount, getSocialPlatformOption } from '../socialPlatforms';
 import { getMobileLayout, MOBILE_GRID_CONFIG } from '../utils/mobileLayout';
@@ -27,6 +28,8 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
 
   const profile = bento.data.profile;
   const blocks = bento.data.blocks;
+  const avatarSrc = resolveImageSrc(profile.avatarUrl);
+  const backgroundSrc = resolveImageSrc(profile.backgroundImage);
   const isDark = profile.theme === 'dark';
   const headingText = isDark ? 'text-gray-100' : 'text-gray-900';
   const bodyText = isDark ? 'text-gray-300' : 'text-gray-500';
@@ -91,9 +94,9 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
   };
 
   // Background style
-  const bgStyle: React.CSSProperties = profile.backgroundImage
+  const bgStyle: React.CSSProperties = backgroundSrc
     ? {
-        backgroundImage: `url('${profile.backgroundImage}')`,
+        backgroundImage: `url('${backgroundSrc}')`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed',
@@ -111,7 +114,7 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
         <style>{profile.customCss}</style>
       )}
       {/* Background blur overlay */}
-      {profile.backgroundImage && profile.backgroundBlur && profile.backgroundBlur > 0 && (
+      {backgroundSrc && profile.backgroundBlur && profile.backgroundBlur > 0 && (
         <div
           className="fixed inset-0 z-0 pointer-events-none"
           style={{
@@ -129,9 +132,9 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
             <div className="flex flex-col items-start text-left">
               <div className="relative group mb-8">
                 <div className="w-40 h-40 overflow-hidden bg-gray-100" style={avatarStyle}>
-                  {profile.avatarUrl ? (
+                  {avatarSrc ? (
                     <img
-                      src={profile.avatarUrl}
+                      src={avatarSrc}
                       alt={profile.name}
                       className="w-full h-full object-cover"
                     />
@@ -189,9 +192,9 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
           {/* Centered Profile */}
           <div className="p-4 pt-8 flex flex-col items-center text-center">
             <div className="w-24 h-24 mb-4 overflow-hidden bg-gray-100" style={avatarStyle}>
-              {profile.avatarUrl ? (
+              {avatarSrc ? (
                 <img
-                  src={profile.avatarUrl}
+                  src={avatarSrc}
                   alt={profile.name}
                   className="w-full h-full object-cover"
                 />

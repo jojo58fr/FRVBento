@@ -3,6 +3,7 @@
  */
 
 import { SiteData } from '../../../../types';
+import { resolveImageSrc } from '../../../../utils/imageData';
 import { ImageMap } from '../../imageExtractor';
 import { generateImports } from './imports';
 import { generateTypes } from './types';
@@ -19,7 +20,7 @@ import {
 
 export const generateAppTsx = (data: SiteData, imageMap: ImageMap, siteId?: string): string => {
   const { profile, blocks } = data;
-  const avatarSrc = imageMap['profile_avatar'] || profile.avatarUrl;
+  const avatarSrc = imageMap['profile_avatar'] || resolveImageSrc(profile.avatarUrl) || '';
 
   // Avatar style configuration
   const avatarStyle = profile.avatarStyle || {
@@ -38,21 +39,29 @@ export const generateAppTsx = (data: SiteData, imageMap: ImageMap, siteId?: stri
       : 'none';
 
   // Background style
-  const bgStyle = profile.backgroundImage
-    ? `{ backgroundImage: "url('${profile.backgroundImage}')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }`
+  const backgroundSrc = resolveImageSrc(profile.backgroundImage);
+  const bgStyle = backgroundSrc
+    ? `{ backgroundImage: "url('${backgroundSrc}')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }`
     : `{ backgroundColor: '${profile.backgroundColor || '#f8fafc'}' }`;
 
   // Generate JSON data for blocks and profile
   const blocksJson = JSON.stringify(
-    blocks.map((b) => ({
-      ...b,
-      imageUrl: b.imageUrl && imageMap[`block_${b.id}`] ? imageMap[`block_${b.id}`] : b.imageUrl,
-    }))
+    blocks.map((b) => {
+      const imageUrl = resolveImageSrc(b.imageUrl);
+      return {
+        ...b,
+        imageUrl: imageUrl && imageMap[`block_${b.id}`] ? imageMap[`block_${b.id}`] : imageUrl,
+      };
+    })
   );
 
   const profileJson = JSON.stringify({
     ...profile,
     avatarUrl: avatarSrc,
+    backgroundImage: backgroundSrc,
+    openGraph: profile.openGraph
+      ? { ...profile.openGraph, image: resolveImageSrc(profile.openGraph.image) }
+      : undefined,
   });
 
   // Layout parameters
@@ -65,7 +74,7 @@ export const generateAppTsx = (data: SiteData, imageMap: ImageMap, siteId?: stri
     hasSocialAccounts: !!(profile.socialAccounts && profile.socialAccounts.length > 0),
     showBranding: profile.showBranding !== false,
     backgroundBlur: profile.backgroundBlur,
-    backgroundImage: profile.backgroundImage,
+    backgroundImage: backgroundSrc,
   };
 
   // Site ID for analytics (use provided siteId or fallback)
@@ -103,7 +112,7 @@ export default function App() {
   return (
     <div className="min-h-screen font-sans" style={bgStyle}>
       {customCss ? <style>{customCss}</style> : null}
-      ${generateBackgroundBlur(profile.backgroundImage, profile.backgroundBlur)}
+      ${generateBackgroundBlur(backgroundSrc, profile.backgroundBlur)}
       <div className="relative z-10">
 ${generateDesktopLayout(layoutParams)}
 

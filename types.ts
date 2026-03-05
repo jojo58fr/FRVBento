@@ -51,7 +51,7 @@ export interface BlockData {
   title?: string;
   content?: string; // URL or Text
   subtext?: string;
-  imageUrl?: string;
+  imageUrl?: string | ImageData;
   mediaPosition?: { x: number; y: number }; // Object position for media (0-100 for each axis)
   colSpan: number; // 1-9 (9-col grid)
   rowSpan: number; // 1+ (builder clamps to 50)
@@ -79,6 +79,10 @@ export interface BlockData {
   zIndex?: number;
 }
 
+export type ImageData =
+  | { kind: 'data'; dataUrl: string }
+  | { kind: 'chunked'; mime: string; chunks: string[] };
+
 // Profile picture style options
 export interface AvatarStyle {
   shape: 'circle' | 'square' | 'rounded'; // circle, square, or rounded corners
@@ -92,7 +96,7 @@ export interface AvatarStyle {
 export interface OpenGraphData {
   title?: string; // Title for social previews (defaults to profile name)
   description?: string; // Description (max 200 chars recommended)
-  image?: string; // Image URL (1200x630px recommended)
+  image?: string | ImageData; // Image URL (1200x630px recommended)
   siteName?: string; // Site name
   twitterHandle?: string; // Twitter/X handle (without @)
   twitterCardType?: 'summary' | 'summary_large_image'; // Twitter card type
@@ -101,7 +105,7 @@ export interface OpenGraphData {
 export interface UserProfile {
   name: string;
   bio: string;
-  avatarUrl: string;
+  avatarUrl: string | ImageData;
   avatarStyle?: AvatarStyle; // Profile picture style options
   theme: 'light' | 'dark';
   primaryColor: string;
@@ -112,7 +116,7 @@ export interface UserProfile {
   showFollowerCount?: boolean; // Show follower count next to social icons
   // Background customization
   backgroundColor?: string; // CSS color value (hex, rgb, etc.)
-  backgroundImage?: string; // URL or data URL for background image
+  backgroundImage?: string | ImageData; // URL or data URL for background image
   backgroundBlur?: number; // Blur amount for background image (0-20)
   analytics?: {
     enabled?: boolean;

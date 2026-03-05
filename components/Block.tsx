@@ -15,6 +15,7 @@ import {
 import { motion } from 'framer-motion';
 import { getSocialPlatformOption, inferSocialPlatformFromUrl } from '../socialPlatforms';
 import { openSafeUrl, isValidYouTubeChannelId, isValidLocationString } from '../utils/security';
+import { resolveImageSrc } from '../utils/imageData';
 
 // Apple TV style 3D tilt effect hook
 const useTiltEffect = (isEnabled: boolean = true) => {
@@ -633,7 +634,8 @@ const Block: React.FC<BlockProps> = ({
   const isYoutubeGrid = isYoutube && block.youtubeMode === 'grid';
   const isYoutubeList = isYoutube && block.youtubeMode === 'list';
 
-  const isLinkWithImage = block.type === BlockType.LINK && block.imageUrl;
+    const resolvedImageUrl = resolveImageSrc(block.imageUrl);
+    const isLinkWithImage = block.type === BlockType.LINK && !!resolvedImageUrl;
 
   const backgroundStyle: React.CSSProperties = block.customBackground
     ? { background: block.customBackground }
@@ -647,14 +649,14 @@ const Block: React.FC<BlockProps> = ({
       backgroundSize: 'cover',
       backgroundPosition: 'center',
     };
-  } else if (isLinkWithImage && block.imageUrl) {
-    const pos = mediaPosition;
-    finalStyle = {
-      backgroundImage: `url(${block.imageUrl})`,
-      backgroundSize: 'cover',
-      backgroundPosition: `${pos.x}% ${pos.y}%`,
-    };
-  }
+    } else if (isLinkWithImage && resolvedImageUrl) {
+      const pos = mediaPosition;
+      finalStyle = {
+        backgroundImage: `url(${resolvedImageUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: `${pos.x}% ${pos.y}%`,
+      };
+    }
 
   // ===== YOUTUBE GRID/LIST LAYOUT (ADAPTIVE) =====
   if (isYoutubeGrid || isYoutubeList) {
@@ -995,7 +997,7 @@ const Block: React.FC<BlockProps> = ({
 
         <div className="w-full h-full pointer-events-none relative z-10">
           {/* MEDIA BLOCK (Image/Video/GIF) */}
-          {block.type === BlockType.MEDIA && block.imageUrl && !isLinkWithImage ? (
+            {block.type === BlockType.MEDIA && resolvedImageUrl && !isLinkWithImage ? (
             <div
               ref={mediaContainerRef}
               className={`w-full h-full relative overflow-hidden ${isRepositioning ? 'cursor-move' : ''}`}
@@ -1003,9 +1005,9 @@ const Block: React.FC<BlockProps> = ({
               onTouchStart={isRepositioning ? handleMediaRepositionStart : undefined}
             >
               {/* Check if it's a video or gif */}
-              {/\.(mp4|webm|ogg|mov)$/i.test(block.imageUrl) ? (
+                {/\.(mp4|webm|ogg|mov)$/i.test(resolvedImageUrl) ? (
                 <video
-                  src={block.imageUrl}
+                    src={resolvedImageUrl}
                   className="full-img"
                   style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
                   autoPlay
@@ -1015,7 +1017,7 @@ const Block: React.FC<BlockProps> = ({
                 />
               ) : (
                 <img
-                  src={block.imageUrl}
+                    src={resolvedImageUrl}
                   alt={block.title || ''}
                   className="full-img"
                   style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}

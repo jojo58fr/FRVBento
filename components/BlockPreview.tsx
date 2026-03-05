@@ -3,6 +3,7 @@ import { BlockData, BlockType } from '../types';
 import { Youtube, Play, Loader2 } from 'lucide-react';
 import { getSocialPlatformOption, inferSocialPlatformFromUrl } from '../socialPlatforms';
 import { openSafeUrl, isValidYouTubeChannelId, isValidLocationString } from '../utils/security';
+import { resolveImageSrc } from '../utils/imageData';
 
 // Apple TV style 3D tilt effect hook
 const useTiltEffect = (isEnabled: boolean = true) => {
@@ -236,7 +237,8 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
   const isRichYoutube =
     isYoutube && activeVideoId && block.youtubeMode !== 'grid' && block.youtubeMode !== 'list';
   const isYoutubeGrid = isYoutube && (block.youtubeMode === 'grid' || block.youtubeMode === 'list');
-  const isLinkWithImage = block.type === BlockType.LINK && block.imageUrl;
+  const resolvedImageUrl = resolveImageSrc(block.imageUrl);
+  const isLinkWithImage = block.type === BlockType.LINK && !!resolvedImageUrl;
 
   // Background style
   let finalStyle: React.CSSProperties = block.customBackground
@@ -248,13 +250,13 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
       backgroundSize: 'cover',
       backgroundPosition: 'center',
     };
-  } else if (isLinkWithImage && block.imageUrl) {
-    finalStyle = {
-      backgroundImage: `url(${block.imageUrl})`,
-      backgroundSize: 'cover',
-      backgroundPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
-    };
-  }
+    } else if (isLinkWithImage && resolvedImageUrl) {
+      finalStyle = {
+        backgroundImage: `url(${resolvedImageUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
+      };
+    }
 
   // ===== SPACER BLOCK =====
   if (block.type === BlockType.SPACER) {
@@ -410,11 +412,11 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
 
         <div className="w-full h-full pointer-events-none relative z-10">
           {/* MEDIA BLOCK */}
-          {block.type === BlockType.MEDIA && block.imageUrl && !isLinkWithImage ? (
+          {block.type === BlockType.MEDIA && resolvedImageUrl && !isLinkWithImage ? (
             <div className="w-full h-full relative overflow-hidden">
-              {/\.(mp4|webm|ogg|mov)$/i.test(block.imageUrl) ? (
+              {/\.(mp4|webm|ogg|mov)$/i.test(resolvedImageUrl) ? (
                 <video
-                  src={block.imageUrl}
+                  src={resolvedImageUrl}
                   className="full-img"
                   style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
                   autoPlay
@@ -424,7 +426,7 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
                 />
               ) : (
                 <img
-                  src={block.imageUrl}
+                  src={resolvedImageUrl}
                   alt={block.title || ''}
                   className="full-img"
                   style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}

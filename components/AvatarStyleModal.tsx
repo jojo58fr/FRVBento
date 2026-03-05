@@ -1,12 +1,13 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X, Circle, Square, RectangleHorizontal, Sun, Minus } from 'lucide-react';
-import type { AvatarStyle } from '../types';
+import type { AvatarStyle, ImageData } from '../types';
+import { resolveImageSrc } from '../utils/imageData';
 
 type AvatarStyleModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  avatarUrl: string;
+  avatarUrl: string | ImageData;
   style: AvatarStyle;
   onStyleChange: (style: AvatarStyle) => void;
 };
@@ -26,6 +27,7 @@ const AvatarStyleModal: React.FC<AvatarStyleModalProps> = ({
   style,
   onStyleChange,
 }) => {
+  const avatarSrc = resolveImageSrc(avatarUrl) || '';
   const currentStyle = { ...DEFAULT_STYLE, ...style };
 
   const getAvatarClasses = (s: AvatarStyle) => {
@@ -90,8 +92,8 @@ const AvatarStyleModal: React.FC<AvatarStyleModalProps> = ({
             {/* Preview */}
             <div className="p-6 bg-gray-50 flex justify-center">
               <div className="relative">
-                <img
-                  src={avatarUrl}
+                  <img
+                    src={avatarSrc}
                   alt="Preview"
                   className={getAvatarClasses(currentStyle)}
                   style={getAvatarStyle(currentStyle)}

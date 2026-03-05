@@ -19,6 +19,7 @@ import {
 import type { SocialPlatform, UserProfile, BlockData } from '../types';
 import { AVATAR_PLACEHOLDER } from '../constants';
 import ImageCropModal from './ImageCropModal';
+import { prepareImageData, resolveImageSrc } from '../utils/imageData';
 import {
   buildSocialUrl,
   getSocialPlatformOption,
@@ -56,6 +57,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [pendingAvatarSrc, setPendingAvatarSrc] = useState<string | null>(null);
+  const [imageNotice, setImageNotice] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!imageNotice && !imageError) return;
+    const timer = window.setTimeout(() => {
+      setImageNotice(null);
+      setImageError(null);
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [imageNotice, imageError]);
+
+  const avatarSrc = resolveImageSrc(profile.avatarUrl);
+  const backgroundSrc = resolveImageSrc(profile.backgroundImage);
+  const openGraphImageSrc = resolveImageSrc(profile.openGraph?.image);
+  const avatarInputValue = typeof profile.avatarUrl === 'string' ? profile.avatarUrl : '';
+  const backgroundInputValue =
+    typeof profile.backgroundImage === 'string' ? profile.backgroundImage : '';
+  const openGraphInputValue =
+    typeof profile.openGraph?.image === 'string' ? profile.openGraph?.image : '';
   const [activeTab, setActiveTab] = useState<TabType>('general');
 
   // Social accounts state
@@ -395,7 +416,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div className="shrink-0">
                         <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-100 ring-2 ring-white shadow-lg">
                           <img
-                            src={profile.avatarUrl || AVATAR_PLACEHOLDER}
+                            src={avatarSrc || AVATAR_PLACEHOLDER}
                             alt="Avatar"
                             className="w-full h-full object-cover"
                           />
@@ -407,25 +428,34 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                           accept="image/*"
                           onChange={handleAvatarUpload}
                         />
-                        <div className="mt-3 flex gap-2">
-                          <button
-                            type="button"
-                            aria-label="Upload avatar image"
-                            onClick={() => avatarInputRef.current?.click()}
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              type="button"
+                              aria-label="Upload avatar image"
+                              onClick={() => avatarInputRef.current?.click()}
                             className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             <Upload size={14} />
                             Upload
                           </button>
-                          <button
-                            type="button"
-                            aria-label="Reset avatar to default"
-                            onClick={resetAvatar}
+                            <button
+                              type="button"
+                              aria-label="Reset avatar to default"
+                              onClick={resetAvatar}
                             className="px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             Reset
-                          </button>
-                        </div>
+                            </button>
+                          </div>
+                          {(imageNotice || imageError) && (
+                            <div
+                              className={`mt-2 text-xs ${
+                                imageError ? 'text-red-600' : 'text-emerald-600'
+                              }`}
+                            >
+                              {imageError || imageNotice}
+                            </div>
+                          )}
                       </div>
 
                       <div className="flex-1 space-y-3">
@@ -449,7 +479,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                           <input
                             type="text"
                             aria-label="Avatar URL"
-                            value={profile.avatarUrl || ''}
+                            value={avatarInputValue || ''}
                             onChange={(e) => setProfile({ ...profile, avatarUrl: e.target.value })}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-black/5 focus:border-black focus:outline-none transition-all font-mono text-xs text-gray-700"
                             placeholder="/images/avatar.jpg or https://..."
@@ -740,10 +770,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         <input
                           type="text"
                           aria-label="Background image URL"
-                          value={profile.backgroundImage || ''}
-                          onChange={(e) =>
-                            setProfile({ ...profile, backgroundImage: e.target.value || undefined })
-                          }
+                            value={backgroundInputValue || ''}
+                            onChange={(e) =>
+                              setProfile({ ...profile, backgroundImage: e.target.value || undefined })
+                            }
                           placeholder="https://example.com/image.jpg"
                           className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent focus:outline-none"
                         />
@@ -759,24 +789,44 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onload = () => {
-                                  setProfile({
-                                    ...profile,
-                                    backgroundImage: reader.result as string,
-                                  });
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
-                        {profile.backgroundImage && (
-                          <button
-                            type="button"
-                            aria-label="Remove background image"
-                            onClick={() => setProfile({ ...profile, backgroundImage: undefined })}
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = () => {
+                                    void (async () => {
+                                      try {
+                                        setImageError(null);
+                                        const raw = reader.result as string;
+                                        const { image, notices } = await prepareImageData(raw);
+                                        setProfile({ ...profile, backgroundImage: image });
+                                        if (notices.length > 0) {
+                                          const parts: string[] = [];
+                                          if (notices.includes('compressed'))
+                                            parts.push('Image compressée');
+                                          if (notices.includes('chunked'))
+                                            parts.push(
+                                              'Image grande, sauvegardée en plusieurs morceaux pour l’export'
+                                            );
+                                          setImageNotice(parts.join(' · '));
+                                        } else {
+                                          setImageNotice(null);
+                                        }
+                                      } catch (error) {
+                                        const message =
+                                          error instanceof Error ? error.message : 'Image invalide';
+                                        setImageError(message);
+                                      }
+                                    })();
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                          {backgroundSrc && (
+                            <button
+                              type="button"
+                              aria-label="Remove background image"
+                              onClick={() => setProfile({ ...profile, backgroundImage: undefined })}
                             className="px-3 py-2 bg-red-50 hover:bg-red-100 rounded-lg text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
                             title="Remove background image"
                           >
@@ -784,19 +834,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                           </button>
                         )}
                       </div>
-                      {profile.backgroundImage && (
-                        <div className="relative w-full h-24 rounded-lg overflow-hidden border border-gray-200">
-                          <img
-                            src={profile.backgroundImage}
-                            alt="Background preview"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                    </div>
+                        {backgroundSrc && (
+                          <div className="relative w-full h-24 rounded-lg overflow-hidden border border-gray-200">
+                            <img
+                              src={backgroundSrc}
+                              alt="Background preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        {(imageNotice || imageError) && (
+                          <div
+                            className={`text-xs ${
+                              imageError ? 'text-red-600' : 'text-emerald-600'
+                            }`}
+                          >
+                            {imageError || imageNotice}
+                          </div>
+                        )}
+                      </div>
 
                     {/* Background Blur (only when image is set) */}
-                    {profile.backgroundImage && (
+                      {backgroundSrc && (
                       <div className="space-y-2">
                         <div className="flex justify-between items-center">
                           <label className="block text-sm font-medium text-gray-700">
@@ -1055,20 +1114,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       Image
                     </label>
                     <div className="flex gap-2">
-                      <input
-                        id="og-image"
-                        type="url"
-                        value={
-                          profile.openGraph?.image?.startsWith('data:')
-                            ? ''
-                            : profile.openGraph?.image || ''
-                        }
-                        onChange={(e) =>
-                          setProfile({
-                            ...profile,
-                            openGraph: { ...profile.openGraph, image: e.target.value },
-                          })
-                        }
+                        <input
+                          id="og-image"
+                          type="url"
+                          value={openGraphInputValue?.startsWith('data:') ? '' : openGraphInputValue}
+                          onChange={(e) =>
+                            setProfile({
+                              ...profile,
+                              openGraph: { ...profile.openGraph, image: e.target.value },
+                            })
+                          }
                         placeholder="https://example.com/image.png"
                         className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
@@ -1083,25 +1138,48 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                           accept="image/*"
                           aria-label="Upload OpenGraph image"
                           className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = () => {
-                                setProfile({
-                                  ...profile,
-                                  openGraph: {
-                                    ...profile.openGraph,
-                                    image: reader.result as string,
-                                  },
-                                });
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  void (async () => {
+                                    try {
+                                      setImageError(null);
+                                      const raw = reader.result as string;
+                                      const { image, notices } = await prepareImageData(raw);
+                                      setProfile({
+                                        ...profile,
+                                        openGraph: {
+                                          ...profile.openGraph,
+                                          image,
+                                        },
+                                      });
+                                      if (notices.length > 0) {
+                                        const parts: string[] = [];
+                                        if (notices.includes('compressed'))
+                                          parts.push('Image compressée');
+                                        if (notices.includes('chunked'))
+                                          parts.push(
+                                            'Image grande, sauvegardée en plusieurs morceaux pour l’export'
+                                          );
+                                        setImageNotice(parts.join(' · '));
+                                      } else {
+                                        setImageNotice(null);
+                                      }
+                                    } catch (error) {
+                                      const message =
+                                        error instanceof Error ? error.message : 'Image invalide';
+                                      setImageError(message);
+                                    }
+                                  })();
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
                       </label>
-                      {profile.openGraph?.image && (
+                      {openGraphImageSrc && (
                         <button
                           type="button"
                           aria-label="Remove image"
@@ -1119,10 +1197,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       )}
                     </div>
                     <p className="text-xs text-gray-400">Recommended size: 1200x630 pixels</p>
-                    {profile.openGraph?.image && (
+                    {(imageNotice || imageError) && (
+                      <div
+                        className={`text-xs ${
+                          imageError ? 'text-red-600' : 'text-emerald-600'
+                        }`}
+                      >
+                        {imageError || imageNotice}
+                      </div>
+                    )}
+                    {openGraphImageSrc && (
                       <div className="mt-2 p-2 bg-gray-50 rounded-lg">
                         <img
-                          src={profile.openGraph.image}
+                          src={openGraphImageSrc}
                           alt="OG Preview"
                           className="w-full max-w-xs h-auto rounded border border-gray-200"
                           onError={(e) => {
@@ -1236,9 +1323,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         className="w-full bg-gray-100 flex items-center justify-center"
                         style={{ aspectRatio: '1200/630' }}
                       >
-                        {profile.openGraph?.image ? (
+                        {openGraphImageSrc ? (
                           <img
-                            src={profile.openGraph.image}
+                            src={openGraphImageSrc}
                             alt="Preview"
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -1564,8 +1651,27 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             title="Crop profile photo"
             onCancel={() => setPendingAvatarSrc(null)}
             onConfirm={(dataUrl) => {
-              setProfile((prev) => ({ ...prev, avatarUrl: dataUrl }));
-              setPendingAvatarSrc(null);
+              void (async () => {
+                try {
+                  setImageError(null);
+                  const { image, notices } = await prepareImageData(dataUrl);
+                  setProfile((prev) => ({ ...prev, avatarUrl: image }));
+                  if (notices.length > 0) {
+                    const parts: string[] = [];
+                    if (notices.includes('compressed')) parts.push('Image compressée');
+                    if (notices.includes('chunked'))
+                      parts.push('Image grande, sauvegardée en plusieurs morceaux pour l’export');
+                    setImageNotice(parts.join(' · '));
+                  } else {
+                    setImageNotice(null);
+                  }
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : 'Image invalide';
+                  setImageError(message);
+                } finally {
+                  setPendingAvatarSrc(null);
+                }
+              })();
             }}
           />
         </motion.div>

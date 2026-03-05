@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BlockData, BlockType, SocialPlatform, UserProfile } from '../types';
 import { BASE_COLORS } from '../constants';
 import {
@@ -30,6 +30,7 @@ import {
   normalizeSocialHandle,
   SOCIAL_PLATFORM_OPTIONS,
 } from '../socialPlatforms';
+import { prepareImageData, resolveImageSrc } from '../utils/imageData';
 
 interface EditorSidebarProps {
   profile: UserProfile;
@@ -52,13 +53,43 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
 }) => {
   const [isFetching, setIsFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [imageNotice, setImageNotice] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!imageNotice && !imageError) return;
+    const timer = window.setTimeout(() => {
+      setImageNotice(null);
+      setImageError(null);
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [imageNotice, imageError]);
 
   const handleBlockImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && editingBlock) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        updateBlock({ ...editingBlock, imageUrl: reader.result as string });
+        void (async () => {
+          try {
+            setImageError(null);
+            const raw = reader.result as string;
+            const { image, notices } = await prepareImageData(raw);
+            updateBlock({ ...editingBlock, imageUrl: image });
+            if (notices.length > 0) {
+              const parts: string[] = [];
+              if (notices.includes('compressed')) parts.push('Image compressée');
+              if (notices.includes('chunked'))
+                parts.push('Image grande, sauvegardée en plusieurs morceaux pour l’export');
+              setImageNotice(parts.join(' · '));
+            } else {
+              setImageNotice(null);
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Image invalide';
+            setImageError(message);
+          }
+        })();
       };
       reader.readAsDataURL(file);
     }
@@ -67,6 +98,9 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
   const isYouTubeActive =
     editingBlock?.type === BlockType.SOCIAL &&
     !!(editingBlock.channelId && editingBlock.channelId.length > 0);
+  const editingBlockImageSrc = resolveImageSrc(editingBlock?.imageUrl);
+  const editingBlockImageInput =
+    typeof editingBlock?.imageUrl === 'string' ? editingBlock.imageUrl : '';
 
   const resolvedSocialPlatform: SocialPlatform | undefined =
     editingBlock?.type === BlockType.SOCIAL
@@ -759,9 +793,18 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                           <Upload size={20} />
                           <span className="text-xs">Click to upload</span>
                         </div>
-                        {editingBlock.imageUrl && (
+                        {editingBlockImageSrc && (
                           <div className="mt-2 text-[10px] text-green-600 font-medium text-center">
                             Image Selected
+                          </div>
+                        )}
+                        {(imageNotice || imageError) && (
+                          <div
+                            className={`mt-2 text-[10px] font-medium text-center ${
+                              imageError ? 'text-red-600' : 'text-emerald-600'
+                            }`}
+                          >
+                            {imageError || imageNotice}
                           </div>
                         )}
                       </label>
@@ -778,11 +821,11 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                   <input
                     type="text"
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 focus:ring-2 focus:ring-black/5 focus:border-black focus:outline-none transition-all font-mono text-xs text-gray-600"
-                    value={
-                      editingBlock.type === BlockType.MEDIA
-                        ? editingBlock.imageUrl || ''
-                        : editingBlock.content || ''
-                    }
+                      value={
+                        editingBlock.type === BlockType.MEDIA
+                          ? editingBlockImageInput || ''
+                          : editingBlock.content || ''
+                      }
                     onChange={(e) => {
                       if (editingBlock.type === BlockType.MEDIA)
                         updateBlock({ ...editingBlock, imageUrl: e.target.value });
