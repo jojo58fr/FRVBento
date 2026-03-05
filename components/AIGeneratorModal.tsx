@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { importBentoFromJSON, type BentoJSON } from '../services/storageService';
 import type { SavedBento } from '../types';
-import { resolveImageSrc } from '../utils/imageData';
+import { isImageData, resolveImageSrc } from '../utils/imageData';
 
 type AIGeneratorModalProps = {
   isOpen: boolean;
@@ -484,7 +484,10 @@ If data needs confirmation → First ask your questions, then provide the JSON a
           textColor: block.textColor || 'text-white',
           socialPlatform: block.socialPlatform,
           socialHandle: block.socialHandle,
-            imageUrl: resolveImageSrc(block.imageUrl),
+          imageUrl:
+            typeof block.imageUrl === 'string' || isImageData(block.imageUrl)
+              ? resolveImageSrc(block.imageUrl)
+              : undefined,
         })),
       };
 
