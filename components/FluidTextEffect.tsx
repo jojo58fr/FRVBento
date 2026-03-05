@@ -47,9 +47,7 @@ function rgbToHex({ r, g, b }: RGB) {
 }
 
 function parseRgbString(input: string) {
-  const match = input
-    .replace(/\s+/g, '')
-    .match(/^rgba?\((\d+),(\d+),(\d+)(?:,([0-9.]+))?\)$/i);
+  const match = input.replace(/\s+/g, '').match(/^rgba?\((\d+),(\d+),(\d+)(?:,([0-9.]+))?\)$/i);
   if (!match) return null;
   return {
     r: Number(match[1]),
@@ -458,8 +456,8 @@ const FluidTextEffect: React.FC<FluidTextEffectProps> = ({
       }
 
       type Pointer = ReturnType<typeof PointerPrototype>;
-      let pointers: Pointer[] = [PointerPrototype()];
-      let splatStack: number[] = [];
+      const pointers: Pointer[] = [PointerPrototype()];
+      const splatStack: number[] = [];
 
       const { gl: glMaybeNull, ext } = getWebGLContext(fluidCanvas);
       if (!glMaybeNull) return;
@@ -605,7 +603,7 @@ const FluidTextEffect: React.FC<FluidTextEffectProps> = ({
         gl.linkProgram(program);
 
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-          console.trace(gl.getProgramInfoLog(program));
+          console.warn(gl.getProgramInfoLog(program));
         }
 
         return program;
@@ -629,7 +627,7 @@ const FluidTextEffect: React.FC<FluidTextEffectProps> = ({
         gl.compileShader(shader);
 
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-          console.trace(gl.getShaderInfoLog(shader));
+          console.warn(gl.getShaderInfoLog(shader));
         }
 
         return shader;
@@ -1028,7 +1026,11 @@ const FluidTextEffect: React.FC<FluidTextEffectProps> = ({
       );
 
       gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), gl.STATIC_DRAW);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]),
+        gl.STATIC_DRAW
+      );
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array([0, 1, 2, 0, 2, 3]), gl.STATIC_DRAW);
       gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
@@ -1042,19 +1044,97 @@ const FluidTextEffect: React.FC<FluidTextEffectProps> = ({
       let sunrays: FBO;
       let sunraysTemp: FBO;
 
-      const blurProgram = new Program(gl, blurVertexShader, blurShader, createWebGLProgram, getUniforms);
-      const copyProgram = new Program(gl, baseVertexShader, copyShader, createWebGLProgram, getUniforms);
-      const clearProgram = new Program(gl, baseVertexShader, clearShader, createWebGLProgram, getUniforms);
-      const colorProgram = new Program(gl, baseVertexShader, colorShader, createWebGLProgram, getUniforms);
-      const splatProgram = new Program(gl, baseVertexShader, splatShader, createWebGLProgram, getUniforms);
-      const advectionProgram = new Program(gl, baseVertexShader, advectionShader, createWebGLProgram, getUniforms);
-      const divergenceProgram = new Program(gl, baseVertexShader, divergenceShader, createWebGLProgram, getUniforms);
-      const curlProgram = new Program(gl, baseVertexShader, curlShader, createWebGLProgram, getUniforms);
-      const vorticityProgram = new Program(gl, baseVertexShader, vorticityShader, createWebGLProgram, getUniforms);
-      const pressureProgram = new Program(gl, baseVertexShader, pressureShader, createWebGLProgram, getUniforms);
-      const gradienSubtractProgram = new Program(gl, baseVertexShader, gradientSubtractShader, createWebGLProgram, getUniforms);
-      const sunraysMaskProgram = new Program(gl, baseVertexShader, sunraysMaskShader, createWebGLProgram, getUniforms);
-      const sunraysProgram = new Program(gl, baseVertexShader, sunraysShader, createWebGLProgram, getUniforms);
+      const blurProgram = new Program(
+        gl,
+        blurVertexShader,
+        blurShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const copyProgram = new Program(
+        gl,
+        baseVertexShader,
+        copyShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const clearProgram = new Program(
+        gl,
+        baseVertexShader,
+        clearShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const colorProgram = new Program(
+        gl,
+        baseVertexShader,
+        colorShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const splatProgram = new Program(
+        gl,
+        baseVertexShader,
+        splatShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const advectionProgram = new Program(
+        gl,
+        baseVertexShader,
+        advectionShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const divergenceProgram = new Program(
+        gl,
+        baseVertexShader,
+        divergenceShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const curlProgram = new Program(
+        gl,
+        baseVertexShader,
+        curlShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const vorticityProgram = new Program(
+        gl,
+        baseVertexShader,
+        vorticityShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const pressureProgram = new Program(
+        gl,
+        baseVertexShader,
+        pressureShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const gradienSubtractProgram = new Program(
+        gl,
+        baseVertexShader,
+        gradientSubtractShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const sunraysMaskProgram = new Program(
+        gl,
+        baseVertexShader,
+        sunraysMaskShader,
+        createWebGLProgram,
+        getUniforms
+      );
+      const sunraysProgram = new Program(
+        gl,
+        baseVertexShader,
+        sunraysShader,
+        createWebGLProgram,
+        getUniforms
+      );
 
       const displayMaterial = new Material(
         gl,
@@ -1358,7 +1438,8 @@ const FluidTextEffect: React.FC<FluidTextEffectProps> = ({
 
       function generateColor() {
         const c = HSVtoRGB(
-          Math.random() * ((config as any).END_HUE - (config as any).START_HUE) + (config as any).START_HUE,
+          Math.random() * ((config as any).END_HUE - (config as any).START_HUE) +
+            (config as any).START_HUE,
           1.0,
           1.0
         );
@@ -1386,7 +1467,10 @@ const FluidTextEffect: React.FC<FluidTextEffectProps> = ({
         gl.uniform1f(splatProgram.uniforms.aspectRatio, fluidCanvas.width / fluidCanvas.height);
         gl.uniform2f(splatProgram.uniforms.point, x, y);
         gl.uniform3f(splatProgram.uniforms.color, dx, dy, 0.0);
-        gl.uniform1f(splatProgram.uniforms.radius, correctRadius((config as any).SPLAT_RADIUS / 100.0));
+        gl.uniform1f(
+          splatProgram.uniforms.radius,
+          correctRadius((config as any).SPLAT_RADIUS / 100.0)
+        );
         blit(velocity.write);
         velocity.swap();
 
@@ -1438,7 +1522,11 @@ const FluidTextEffect: React.FC<FluidTextEffectProps> = ({
         velocity.swap();
 
         divergenceProgram.bind();
-        gl.uniform2f(divergenceProgram.uniforms.texelSize, velocity.texelSizeX, velocity.texelSizeY);
+        gl.uniform2f(
+          divergenceProgram.uniforms.texelSize,
+          velocity.texelSizeX,
+          velocity.texelSizeY
+        );
         gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.read.attach(0));
         blit(divergence);
 
@@ -1458,7 +1546,11 @@ const FluidTextEffect: React.FC<FluidTextEffectProps> = ({
         }
 
         gradienSubtractProgram.bind();
-        gl.uniform2f(gradienSubtractProgram.uniforms.texelSize, velocity.texelSizeX, velocity.texelSizeY);
+        gl.uniform2f(
+          gradienSubtractProgram.uniforms.texelSize,
+          velocity.texelSizeX,
+          velocity.texelSizeY
+        );
         gl.uniform1i(gradienSubtractProgram.uniforms.uPressure, pressure.read.attach(0));
         gl.uniform1i(gradienSubtractProgram.uniforms.uVelocity, velocity.read.attach(1));
         blit(velocity.write);
@@ -1467,7 +1559,11 @@ const FluidTextEffect: React.FC<FluidTextEffectProps> = ({
         advectionProgram.bind();
         gl.uniform2f(advectionProgram.uniforms.texelSize, velocity.texelSizeX, velocity.texelSizeY);
         if (!ext.supportLinearFiltering) {
-          gl.uniform2f(advectionProgram.uniforms.dyeTexelSize, velocity.texelSizeX, velocity.texelSizeY);
+          gl.uniform2f(
+            advectionProgram.uniforms.dyeTexelSize,
+            velocity.texelSizeX,
+            velocity.texelSizeY
+          );
         }
         const velocityId = velocity.read.attach(0);
         gl.uniform1i(advectionProgram.uniforms.uVelocity, velocityId);
@@ -1746,8 +1842,10 @@ const FluidTextEffect: React.FC<FluidTextEffectProps> = ({
       if (handleMouseDown) container.addEventListener('mousedown', handleMouseDown);
       if (handleMouseMove) container.addEventListener('mousemove', handleMouseMove);
       if (handleMouseUp) container.addEventListener('mouseup', handleMouseUp);
-      if (handleTouchStart) container.addEventListener('touchstart', handleTouchStart, { passive: false });
-      if (handleTouchMove) container.addEventListener('touchmove', handleTouchMove, { passive: false });
+      if (handleTouchStart)
+        container.addEventListener('touchstart', handleTouchStart, { passive: false });
+      if (handleTouchMove)
+        container.addEventListener('touchmove', handleTouchMove, { passive: false });
       if (handleTouchEnd) container.addEventListener('touchend', handleTouchEnd);
 
       function blit(target: FBO | null, clear = false) {

@@ -317,7 +317,9 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                       value={editingBlock.title || ''}
                       onChange={(e) => updateBlock({ ...editingBlock, title: e.target.value })}
                       placeholder={
-                        editingBlock.type === BlockType.FLUID_TEXT ? 'Enter text' : 'Label your block'
+                        editingBlock.type === BlockType.FLUID_TEXT
+                          ? 'Enter text'
+                          : 'Label your block'
                       }
                     />
                   </div>
