@@ -5,6 +5,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Traefik dynamic domains
+_traefik/
 lerna-debug.log*
 
 node_modules

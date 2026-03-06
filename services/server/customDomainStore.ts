@@ -1,5 +1,7 @@
 import { randomBytes } from 'crypto';
 import { promises as dns } from 'dns';
+import { promises as fs } from 'fs';
+import path from 'path';
 import type { SavedBento } from '../../types';
 import { prisma } from './prisma';
 
@@ -101,10 +103,46 @@ export const createCustomDomainForOwner = async (
       ownerId,
     },
   });
+  await writeTraefikCustomDomains();
   return mapRecord(created);
 };
 
 const normalizeDnsValue = (value: string): string => value.trim().toLowerCase().replace(/\.$/, '');
+
+const TRAEFIK_CUSTOM_DOMAINS_PATH = path.join(
+  process.cwd(),
+  '_traefik',
+  'custom-domains.yml'
+);
+
+const buildTraefikRouterName = (domain: string): string =>
+  `bento-domain-${domain.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase()}`;
+
+const writeTraefikCustomDomains = async (): Promise<void> => {
+  const records = await prisma.customDomain.findMany({
+    select: { domain: true },
+    orderBy: { domain: 'asc' },
+  });
+  const domains = records.map((record) => record.domain);
+
+  const lines: string[] = [];
+  lines.push('http:');
+  lines.push('  routers:');
+
+  for (const domain of domains) {
+    const routerName = buildTraefikRouterName(domain);
+    lines.push(`    ${routerName}:`);
+    lines.push(`      rule: "Host(\`${domain}\`)"`);
+    lines.push('      entryPoints: ["websecure"]');
+    lines.push('      tls:');
+    lines.push('        certResolver: mytlschallenge');
+    lines.push('      service: bento-web-svc');
+  }
+
+  const content = lines.join('\n') + '\n';
+  await fs.mkdir(path.dirname(TRAEFIK_CUSTOM_DOMAINS_PATH), { recursive: true });
+  await fs.writeFile(TRAEFIK_CUSTOM_DOMAINS_PATH, content, 'utf8');
+};
 
 export const verifyCustomDomainForOwner = async (
   ownerId: string,
@@ -148,6 +186,7 @@ export const verifyCustomDomainForOwner = async (
       lastCheckedAt: new Date(),
     },
   });
+  await writeTraefikCustomDomains();
 
   return {
     ...mapRecord(updated),
@@ -161,6 +200,7 @@ export const deleteCustomDomainForOwner = async (ownerId: string, id: number): P
     throw new Error('Custom domain not found');
   }
   await prisma.customDomain.delete({ where: { id } });
+  await writeTraefikCustomDomains();
 };
 
 export const getBentoByCustomDomain = async (
