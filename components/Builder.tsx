@@ -466,6 +466,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const [publicSlugMessage, setPublicSlugMessage] = useState<string>('');
   const [publicSlugLoading, setPublicSlugLoading] = useState(false);
   const [publicSlugDeployChecked, setPublicSlugDeployChecked] = useState(false);
+  const [customDomainOpen, setCustomDomainOpen] = useState(false);
   const [customDomains, setCustomDomains] = useState<CustomDomain[]>([]);
   const [customDomainInput, setCustomDomainInput] = useState('');
   const [customDomainStatus, setCustomDomainStatus] = useState<
@@ -1009,6 +1010,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     setHasDownloadedExport(false);
     setExportError(null);
     setDeployExpertMode(false);
+    setCustomDomainOpen(false);
     setPublicSlug(profile?.publicSlug || '');
     setPublicSlugStatus('idle');
     setPublicSlugMessage('');
@@ -2848,11 +2850,11 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           >
-            <motion.div
+          <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden ring-1 ring-gray-900/5"
+              className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-hidden ring-1 ring-gray-900/5 flex flex-col"
             >
               <div className="p-6 pb-4 flex justify-between items-start">
                 <div>
@@ -2873,7 +2875,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                 </button>
               </div>
 
-              <div className="px-6 space-y-4 pb-2">
+              <div className="px-6 space-y-4 pb-2 flex-1 overflow-y-auto">
                 <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl p-3">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Mode expert</p>
@@ -2955,124 +2957,170 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                       )}
                     </div>
 
-                    <div className="pt-3 border-t border-gray-200 space-y-3">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                        Nom de domaine personnalisé
-                      </label>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <input
-                          type="text"
-                          value={customDomainInput}
-                          onChange={(e) => {
-                            setCustomDomainInput(e.target.value);
-                            setCustomDomainStatus('idle');
-                            setCustomDomainError('');
-                          }}
-                          placeholder="mon-domaine.com"
-                          disabled={!canPublishPublicUrl}
-                          className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleVerifyCustomDomain}
-                          disabled={!canPublishPublicUrl || !customDomainInput.trim()}
-                          className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          {customDomainStatus === 'verifying' || customDomainStatus === 'creating'
-                            ? 'Vérification…'
-                            : 'Vérifier'}
-                        </button>
+                    <div
+                      className={`flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl p-3 ${
+                        !isPublicUrlPublished ? 'opacity-60' : ''
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          Nom de domaine personnalisé
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Associe un domaine à ton URL publiée.
+                        </p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isPublicUrlPublished) return;
+                          setCustomDomainOpen((prev) => !prev);
+                        }}
+                        disabled={!isPublicUrlPublished}
+                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                          customDomainOpen && isPublicUrlPublished
+                            ? 'bg-gray-900'
+                            : 'bg-gray-200'
+                        } ${!isPublicUrlPublished ? 'cursor-not-allowed' : ''}`}
+                        aria-pressed={customDomainOpen && isPublicUrlPublished}
+                        aria-label="Toggle custom domain"
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                            customDomainOpen && isPublicUrlPublished
+                              ? 'translate-x-6'
+                              : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    {!isPublicUrlPublished && (
+                      <p className="text-xs text-gray-500">
+                        Vous devez publier le projet avant d&apos;associer un nom de domaine
+                        personalisée
+                      </p>
+                    )}
 
-                      {customDomainError && (
-                        <p className="text-xs text-red-600">{customDomainError}</p>
-                      )}
+                    {customDomainOpen && isPublicUrlPublished && (
+                      <div className="pt-3 border-t border-gray-200 space-y-3">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                          Nom de domaine personnalisé
+                        </label>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            type="text"
+                            value={customDomainInput}
+                            onChange={(e) => {
+                              setCustomDomainInput(e.target.value);
+                              setCustomDomainStatus('idle');
+                              setCustomDomainError('');
+                            }}
+                            placeholder="mon-domaine.com"
+                            disabled={!canPublishPublicUrl}
+                            className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleVerifyCustomDomain}
+                            disabled={!canPublishPublicUrl || !customDomainInput.trim()}
+                            className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            {customDomainStatus === 'verifying' || customDomainStatus === 'creating'
+                              ? 'Vérification…'
+                              : 'Vérifier'}
+                          </button>
+                        </div>
 
-                      {customDomainInstructions && (
-                        <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 space-y-2">
-                          <p className="font-semibold text-gray-900">
-                            Ajoute ces entrées DNS :
-                          </p>
-                          <div className="grid grid-cols-1 gap-2">
-                            <div className="flex flex-col gap-1">
-                              <span className="font-mono text-[11px] text-gray-600">TXT</span>
-                              <span className="font-mono text-[11px] text-gray-800">
-                                {customDomainInstructions.txtHost} = {customDomainInstructions.txtValue}
-                              </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="font-mono text-[11px] text-gray-600">CNAME</span>
-                              <span className="font-mono text-[11px] text-gray-800">
-                                {customDomainInstructions.cnameHost} → {customDomainInstructions.cnameTarget}
-                              </span>
+                        {customDomainError && (
+                          <p className="text-xs text-red-600">{customDomainError}</p>
+                        )}
+
+                        {customDomainInstructions && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 space-y-2">
+                            <p className="font-semibold text-gray-900">
+                              Ajoute ces entrées DNS :
+                            </p>
+                            <div className="grid grid-cols-1 gap-2">
+                              <div className="flex flex-col gap-1">
+                                <span className="font-mono text-[11px] text-gray-600">TXT</span>
+                                <span className="font-mono text-[11px] text-gray-800">
+                                  {customDomainInstructions.txtHost} = {customDomainInstructions.txtValue}
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <span className="font-mono text-[11px] text-gray-600">CNAME</span>
+                                <span className="font-mono text-[11px] text-gray-800">
+                                  {customDomainInstructions.cnameHost} → {customDomainInstructions.cnameTarget}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {customDomainChecks && (
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          <span
-                            className={`px-2 py-1 rounded-full border ${
-                              customDomainChecks.txt
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                : 'bg-amber-50 border-amber-200 text-amber-700'
-                            }`}
-                          >
-                            TXT {customDomainChecks.txt ? 'OK' : 'en attente'}
-                          </span>
-                          <span
-                            className={`px-2 py-1 rounded-full border ${
-                              customDomainChecks.cname
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                : 'bg-amber-50 border-amber-200 text-amber-700'
-                            }`}
-                          >
-                            CNAME {customDomainChecks.cname ? 'OK' : 'en attente'}
-                          </span>
-                        </div>
-                      )}
-
-                      {customDomains.length > 0 && (
-                        <div className="space-y-2">
-                          {customDomains.map((domain) => (
-                            <div
-                              key={domain.id}
-                              className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2"
+                        {customDomainChecks && (
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <span
+                              className={`px-2 py-1 rounded-full border ${
+                                customDomainChecks.txt
+                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                  : 'bg-amber-50 border-amber-200 text-amber-700'
+                              }`}
                             >
-                              <div className="flex-1">
-                                <p className="text-sm font-semibold text-gray-900">
-                                  {domain.domain}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {domain.status === 'verified'
-                                    ? 'Vérifié'
-                                    : domain.status === 'pending'
-                                      ? 'En attente'
-                                      : 'Non vérifié'}
-                                </p>
+                              TXT {customDomainChecks.txt ? 'OK' : 'en attente'}
+                            </span>
+                            <span
+                              className={`px-2 py-1 rounded-full border ${
+                                customDomainChecks.cname
+                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                  : 'bg-amber-50 border-amber-200 text-amber-700'
+                              }`}
+                            >
+                              CNAME {customDomainChecks.cname ? 'OK' : 'en attente'}
+                            </span>
+                          </div>
+                        )}
+
+                        {customDomains.length > 0 && (
+                          <div className="space-y-2">
+                            {customDomains.map((domain) => (
+                              <div
+                                key={domain.id}
+                                className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2"
+                              >
+                                <div className="flex-1">
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {domain.domain}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {domain.status === 'verified'
+                                      ? 'Vérifié'
+                                      : domain.status === 'pending'
+                                        ? 'En attente'
+                                        : 'Non vérifié'}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRecheckCustomDomain(domain.id)}
+                                    className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200"
+                                  >
+                                    Vérifier
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCustomDomain(domain.id)}
+                                    className="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 text-xs font-semibold hover:bg-red-200"
+                                  >
+                                    Supprimer
+                                  </button>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRecheckCustomDomain(domain.id)}
-                                  className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200"
-                                >
-                                  Vérifier
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteCustomDomain(domain.id)}
-                                  className="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 text-xs font-semibold hover:bg-red-200"
-                                >
-                                  Supprimer
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       {!isPublicUrlPublished && (
