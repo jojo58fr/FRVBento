@@ -109,6 +109,24 @@ export const createCustomDomainForOwner = async (
 
 const normalizeDnsValue = (value: string): string => value.trim().toLowerCase().replace(/\.$/, '');
 
+const getDnsServers = (): string[] => {
+  const fromEnv = process.env.CUSTOM_DOMAIN_DNS_SERVERS?.split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (fromEnv && fromEnv.length > 0) return fromEnv;
+  return ['1.1.1.1', '8.8.8.8', '9.9.9.9'];
+};
+
+const createDnsResolver = (): dns.Resolver => {
+  const resolver = new dns.Resolver();
+  try {
+    resolver.setServers(getDnsServers());
+  } catch {
+    // If setServers fails (invalid IPs), fall back to system resolvers.
+  }
+  return resolver;
+};
+
 const TRAEFIK_CUSTOM_DOMAINS_PATH = path.join(
   process.cwd(),
   '_traefik',
@@ -161,16 +179,17 @@ export const verifyCustomDomainForOwner = async (
 
   let cnameOk = false;
   let txtOk = false;
+  const resolver = createDnsResolver();
 
   try {
-    const cnameRecords = await dns.resolveCname(domain);
+    const cnameRecords = await resolver.resolveCname(domain);
     cnameOk = cnameRecords.some((entry) => normalizeDnsValue(entry) === cnameTarget);
   } catch {
     cnameOk = false;
   }
 
   try {
-    const txtRecords = await dns.resolveTxt(txtHost);
+    const txtRecords = await resolver.resolveTxt(txtHost);
     const flattened = txtRecords.flat().map((entry) => entry.trim());
     txtOk = flattened.includes(record.verificationToken);
   } catch {
