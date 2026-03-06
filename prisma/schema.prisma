@@ -15,6 +15,7 @@ model Bento {
   ownerId   String?
   owner     User?          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   published PublishedBento?
+  customDomains CustomDomain[]
 }
 
 model User {
@@ -25,6 +26,7 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   bentos      Bento[]
+  customDomains CustomDomain[]
 }
 
 model PublishedBento {
@@ -34,4 +36,19 @@ model PublishedBento {
   bento     Bento    @relation(fields: [bentoId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model CustomDomain {
+  id                 Int      @id @default(autoincrement())
+  domain             String   @unique
+  status             String   @default("pending")
+  verificationToken  String
+  bentoId            String
+  ownerId            String?
+  verifiedAt         DateTime?
+  lastCheckedAt      DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  bento              Bento    @relation(fields: [bentoId], references: [id], onDelete: Cascade)
+  owner              User?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 }

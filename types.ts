@@ -145,3 +145,16 @@ export interface SavedBento {
   data: SiteData;
   publishedSlug?: string | null;
 }
+
+export interface CustomDomain {
+  id: number;
+  domain: string;
+  status: string;
+  verificationToken: string;
+  bentoId: string;
+  ownerId: string | null;
+  verifiedAt: number | null;
+  lastCheckedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
