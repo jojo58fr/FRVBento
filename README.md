@@ -23,6 +23,13 @@ OpenBento est conçu comme un **builder local avec export**, sans backend ni com
 - offrir une alternative aux services propriétaires de link-in-bio
 
 Le cœur du builder reste basé sur OpenBento, mais l’export devient une **page accessible via une URL du site**.
+Le cœur du builder reste basé sur OpenBento, mais l’export devient une **page accessible via une URL du site**.
+
+### Color Editing
+
+- Use the background action in the top bar to open a dedicated background editor
+- Name and bio now expose a palette button next to the edit pencil in the builder
+- Custom colors use an inline picker widget with presets, HEX input, and eyedropper support when the browser supports `EyeDropper`
 
 ---
 

@@ -13,7 +13,9 @@ import Block from './Block';
 import EditorSidebar from './EditorSidebar';
 import ProfileDropdown from './ProfileDropdown';
 import SettingsModal from './SettingsModal';
+import BackgroundSettingsModal from './BackgroundSettingsModal';
 import ImageCropModal from './ImageCropModal';
+import TextColorModal from './TextColorModal';
 import { useHistory } from '../hooks/useHistory';
 import { useSaveStatus } from '../hooks/useSaveStatus';
 import { useFrvAuth } from '../hooks/useFrvAuth';
@@ -81,6 +83,19 @@ const GRID_MAX_SEARCH_ROWS = 200;
 const MAX_ROW_SPAN = 50; // Allow tall blocks for scrollable content
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const isLightHexColor = (color?: string) => {
+  if (!color) return true;
+  const hex = color.replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return true;
+
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  return luminance > 0.6;
+};
 
 // Migrate blocks from old 3-col grid to new 9-col grid
 // Old blocks had colSpan 1-3, new blocks use colSpan 1-9
@@ -397,6 +412,12 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const [deployExpertMode, setDeployExpertMode] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showBackgroundModal, setShowBackgroundModal] = useState(false);
+  const [textColorTarget, setTextColorTarget] = useState<'name' | 'bio' | null>(null);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<
+    'general' | 'social' | 'seo' | 'analytics' | 'json'
+  >('general');
+  const [settingsInitialSection, setSettingsInitialSection] = useState<'background' | undefined>();
   const [showAvatarCropModal, setShowAvatarCropModal] = useState(false);
   const [showAvatarStyleModal, setShowAvatarStyleModal] = useState(false);
   const [showAIGeneratorModal, setShowAIGeneratorModal] = useState(false);
@@ -1868,6 +1889,15 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     const avatarSrc = resolveImageSrc(profile.avatarUrl);
     const backgroundSrc = resolveImageSrc(profile.backgroundImage);
 
+  const openSettings = (
+    tab: 'general' | 'social' | 'seo' | 'analytics' | 'json' = 'general',
+    section?: 'background'
+  ) => {
+    setSettingsInitialTab(tab);
+    setSettingsInitialSection(section);
+    setShowSettingsModal(true);
+  };
+
   // Background style from profile settings
     const backgroundStyle: React.CSSProperties = backgroundSrc
       ? {
@@ -1879,6 +1909,16 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       : profile.backgroundColor
         ? { backgroundColor: profile.backgroundColor }
         : { backgroundColor: isDark ? '#0b0b0f' : '#f9fafb' }; // default
+
+  const useDarkBackgroundControlText =
+    !profile.backgroundImage && isLightHexColor(profile.backgroundColor || '#f9fafb');
+  const backgroundControlClasses = useDarkBackgroundControlText
+    ? 'bg-white/80 border border-black/10 hover:bg-white/95'
+    : 'bg-white/20 hover:bg-white/30';
+  const profileNameColor = profile.nameColor || (isDark ? '#f3f4f6' : '#111827');
+  const profileBioColor = profile.bioColor || (isDark ? '#d1d5db' : '#6B7280');
+  const profileNameStyle = profile.nameColor ? { color: profileNameColor } : undefined;
+  const profileBioStyle = profile.bioColor ? { color: profileBioColor } : undefined;
 
   return (
     <div className="min-h-screen flex font-sans overflow-x-hidden relative" style={backgroundStyle}>
@@ -1898,70 +1938,92 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         {/* Floating Navbar */}
         <nav className="fixed top-4 left-4 right-4 z-40 pointer-events-none">
           <div className="max-w-[1800px] mx-auto flex justify-between items-center">
-            {/* Logo Pill */}
-            <div className="bg-white px-2 py-2 rounded-2xl shadow-sm border border-gray-200 flex gap-2 items-center pointer-events-auto select-none">
-              {onBack && (
+            <div className="flex items-center gap-3">
+              <div className="bg-white px-2 py-2 rounded-2xl shadow-sm border border-gray-200 flex gap-2 items-center pointer-events-auto select-none">
+                {onBack && (
+                  <button
+                    type="button"
+                    aria-label="Back to home"
+                    onClick={onBack}
+                    className="w-9 h-9 bg-gray-900 text-white rounded-xl flex items-center justify-center hover:bg-black transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="Back to Home"
+                  >
+                    <Home size={16} />
+                  </button>
+                )}
+                <span className="font-bold text-gray-800 tracking-tight px-1">OpenBento</span>
+                <div className="h-6 w-px bg-gray-200 mx-1"></div>
+                {/* Profile Dropdown */}
+                {activeBento && (
+                  <ProfileDropdown
+                    activeBentoId={activeBento.id}
+                    activeBentoName={activeBento.name}
+                    onBentoChange={handleBentoChange}
+                  />
+                )}
+                <div className="h-6 w-px bg-gray-200 mx-1"></div>
+                {/* Save Button with Status */}
                 <button
                   type="button"
-                  aria-label="Back to home"
-                  onClick={onBack}
-                  className="w-9 h-9 bg-gray-900 text-white rounded-xl flex items-center justify-center hover:bg-black transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title="Back to Home"
-                >
-                  <Home size={16} />
-                </button>
-              )}
-              <span className="font-bold text-gray-800 tracking-tight px-1">OpenBento</span>
-              <div className="h-6 w-px bg-gray-200 mx-1"></div>
-              {/* Profile Dropdown */}
-              {activeBento && (
-                <ProfileDropdown
-                  activeBentoId={activeBento.id}
-                  activeBentoName={activeBento.name}
-                  onBentoChange={handleBentoChange}
-                />
-              )}
-              <div className="h-6 w-px bg-gray-200 mx-1"></div>
-              {/* Save Button with Status */}
-              <button
-                type="button"
-                aria-label="Save (Ctrl+S)"
-                onClick={handleManualSave}
-                disabled={saveStatus === 'saving'}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 disabled:opacity-50"
+                  aria-label="Save (Ctrl+S)"
+                  onClick={handleManualSave}
+                  disabled={saveStatus === 'saving'}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 disabled:opacity-50"
                   title={
                     saveStatus === 'error' && saveError
                       ? `Save error: ${saveError}`
                       : 'Save (Ctrl+S)'
                   }
-              >
-                {saveStatus === 'saving' ? (
-                  <>
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full"
-                    />
-                    <span className="text-gray-600">Saving…</span>
-                  </>
-                ) : saveStatus === 'saved' ? (
-                  <>
-                    <Check size={16} className="text-green-500" />
-                    <span className="text-green-600">Saved local</span>
-                  </>
-                ) : saveStatus === 'error' ? (
-                  <>
-                    <AlertCircle size={16} className="text-red-500" />
-                    <span className="text-red-600">Error</span>
-                  </>
-                ) : (
-                  <>
-                    <Save size={16} className="text-gray-500" />
-                    <span className="text-gray-500">{lastSavedAt ? timeAgo : 'Not saved'}</span>
-                  </>
-                )}
-              </button>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium">
+                >
+                  {saveStatus === 'saving' ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full"
+                      />
+                      <span className="text-gray-600">Saving…</span>
+                    </>
+                  ) : saveStatus === 'saved' ? (
+                    <>
+                      <Check size={16} className="text-green-500" />
+                      <span className="text-green-600">Saved local</span>
+                    </>
+                  ) : saveStatus === 'error' ? (
+                    <>
+                      <AlertCircle size={16} className="text-red-500" />
+                      <span className="text-red-600">Error</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} className="text-gray-500" />
+                      <span className="text-gray-500">{lastSavedAt ? timeAgo : 'Not saved'}</span>
+                    </>
+                  )}
+                </button>
+                <div className="h-6 w-px bg-gray-200 mx-1"></div>
+                <div className="flex bg-gray-100/80 p-1 rounded-xl gap-0.5">
+                  <button
+                    type="button"
+                    aria-label="Desktop view"
+                    aria-pressed={viewMode === 'desktop'}
+                    onClick={() => setViewMode('desktop')}
+                    className={`p-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 ${viewMode === 'desktop' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    <Monitor size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Mobile view"
+                    aria-pressed={viewMode === 'mobile'}
+                    onClick={() => setViewMode('mobile')}
+                    className={`p-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 ${viewMode === 'mobile' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    <Smartphone size={16} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium pointer-events-auto">
                 <Globe
                   size={16}
                   className={
@@ -1994,31 +2056,35 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                     : 'Not published'}
                 </span>
               </div>
-              <div className="h-6 w-px bg-gray-200 mx-1"></div>
-              <div className="flex bg-gray-100/80 p-1 rounded-xl gap-0.5">
-                <button
-                  type="button"
-                  aria-label="Desktop view"
-                  aria-pressed={viewMode === 'desktop'}
-                  onClick={() => setViewMode('desktop')}
-                  className={`p-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 ${viewMode === 'desktop' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                  <Monitor size={16} />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Mobile view"
-                  aria-pressed={viewMode === 'mobile'}
-                  onClick={() => setViewMode('mobile')}
-                  className={`p-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 ${viewMode === 'mobile' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                  <Smartphone size={16} />
-                </button>
-              </div>
             </div>
 
             {/* Actions Pill */}
             <div className="flex gap-2 pointer-events-auto">
+              <button
+                type="button"
+                aria-label="Edit background style"
+                onClick={() => setShowBackgroundModal(true)}
+                className={`h-10 px-3 rounded-full backdrop-blur-sm flex items-center justify-center gap-2 transition-colors focus:outline-none focus:ring-2 ${
+                  useDarkBackgroundControlText ? 'focus:ring-gray-400' : 'focus:ring-white'
+                } ${backgroundControlClasses}`}
+                title="Edit background"
+              >
+                <span className="relative block w-5 h-5" aria-hidden="true">
+                  <span className="absolute right-0 top-0 w-3.5 h-3.5 rounded-full bg-gray-500/80 border border-white/50" />
+                  <span className="absolute left-0 bottom-0 w-4 h-4 rounded-full bg-blue-500 border border-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.45)]" />
+                  <span className="absolute -right-1 -bottom-1 w-3.5 h-3.5 rounded-full bg-white/90 border border-gray-200 flex items-center justify-center shadow-sm">
+                    <Palette size={8} className="text-gray-700" />
+                  </span>
+                </span>
+                <span
+                  className={`text-xs font-semibold ${
+                    useDarkBackgroundControlText ? 'text-gray-700' : 'text-white'
+                  }`}
+                >
+                  Background
+                </span>
+              </button>
+
               <button
                 type="button"
                 aria-label={isSidebarOpen ? 'Switch to preview mode' : 'Switch to edit mode'}
@@ -2032,7 +2098,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
               <button
                 type="button"
                 aria-label="Open settings"
-                onClick={() => setShowSettingsModal(true)}
+                onClick={() => openSettings()}
                 className="bg-white px-3.5 py-2 rounded-lg shadow-sm border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 title="Open settings"
               >
@@ -2200,22 +2266,36 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                     onBlur={saveNameEdit}
                     onKeyDown={handleNameKeyDown}
                     className={`text-4xl font-bold tracking-tight bg-transparent border-b-2 border-violet-500 outline-none w-full leading-[1.1] ${headingText}`}
+                    style={profileNameStyle}
                     placeholder="Your name"
                   />
                 ) : (
-                  <div
-                    className="group cursor-pointer flex items-center gap-2"
-                    onClick={startEditingName}
-                  >
+                  <div className="group flex items-center gap-2">
                     <h1
-                      className={`text-4xl font-bold tracking-tight transition-colors leading-[1.1] ${headingText} ${nameHover}`}
+                      className={`text-4xl font-bold tracking-tight transition-colors leading-[1.1] cursor-pointer ${headingText} ${nameHover}`}
+                      style={profileNameStyle}
+                      onClick={startEditingName}
                     >
                       {profile.name}
                     </h1>
-                    <Pencil
-                      size={16}
-                      className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                    />
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        aria-label="Edit name color"
+                        onClick={() => setTextColorTarget('name')}
+                        className="p-1 rounded-full hover:bg-white/70 transition-colors"
+                      >
+                        <Palette size={15} className="text-gray-400" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Edit your name"
+                        onClick={startEditingName}
+                        className="p-1 rounded-full hover:bg-white/70 transition-colors"
+                      >
+                        <Pencil size={16} className="text-gray-300" />
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -2229,20 +2309,38 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                     onBlur={saveBioEdit}
                     onKeyDown={handleBioKeyDown}
                     className={`text-base font-medium leading-relaxed bg-transparent border-b-2 border-violet-500 outline-none w-full resize-none ${bodyText}`}
+                    style={profileBioStyle}
                     rows={3}
                     placeholder="Write something about yourself..."
                   />
                 ) : (
-                  <p
-                    className={`group text-base font-medium leading-relaxed whitespace-pre-wrap cursor-pointer transition-colors flex items-start gap-2 ${bodyText} ${isDark ? 'hover:text-gray-200' : 'hover:text-gray-700'}`}
-                    onClick={startEditingBio}
-                  >
-                    <span className="flex-1">{profile.bio || 'Click to add bio...'}</span>
-                    <Pencil
-                      size={14}
-                      className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity mt-1 shrink-0"
-                    />
-                  </p>
+                  <div className="group flex items-start gap-2">
+                    <p
+                      className={`flex-1 text-base font-medium leading-relaxed whitespace-pre-wrap cursor-pointer transition-colors ${bodyText} ${isDark ? 'hover:text-gray-200' : 'hover:text-gray-700'}`}
+                      style={profileBioStyle}
+                      onClick={startEditingBio}
+                    >
+                      {profile.bio || 'Click to add bio...'}
+                    </p>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-1 shrink-0">
+                      <button
+                        type="button"
+                        aria-label="Edit bio color"
+                        onClick={() => setTextColorTarget('bio')}
+                        className="p-1 rounded-full hover:bg-white/70 transition-colors"
+                      >
+                        <Palette size={14} className="text-gray-400" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Edit your bio"
+                        onClick={startEditingBio}
+                        className="p-1 rounded-full hover:bg-white/70 transition-colors"
+                      >
+                        <Pencil size={14} className="text-gray-300" />
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 {/* Social icons row */}
@@ -2378,11 +2476,13 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                           </div>
                           <h1
                             className={`text-2xl font-extrabold tracking-tight leading-none mb-2 ${headingText}`}
+                            style={profileNameStyle}
                           >
                             {profile.name}
                           </h1>
                           <p
                             className={`text-sm font-medium whitespace-pre-wrap max-w-xs leading-relaxed ${bodyText}`}
+                            style={profileBioStyle}
                           >
                             {profile.bio}
                           </p>
@@ -2754,12 +2854,36 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         closeEdit={closeSidebar}
       />
 
-      {/* 3. SETTINGS MODAL */}
+      {/* 3. BACKGROUND MODAL */}
+      <BackgroundSettingsModal
+        isOpen={showBackgroundModal}
+        onClose={() => setShowBackgroundModal(false)}
+        profile={profile}
+        setProfile={handleSetProfile}
+      />
+
+      <TextColorModal
+        isOpen={textColorTarget !== null}
+        onClose={() => setTextColorTarget(null)}
+        label={textColorTarget === 'name' ? 'Name' : 'Bio'}
+        value={textColorTarget === 'name' ? profileNameColor : profileBioColor}
+        defaultValue={textColorTarget === 'name' ? '#111827' : '#6B7280'}
+        onChange={(hex) =>
+          handleSetProfile((prev) => ({
+            ...prev,
+            [textColorTarget === 'name' ? 'nameColor' : 'bioColor']: hex,
+          }))
+        }
+      />
+
+      {/* 4. SETTINGS MODAL */}
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
         profile={profile}
         setProfile={handleSetProfile}
+        initialTab={settingsInitialTab}
+        initialSection={settingsInitialSection}
         bentoName={activeBento?.name}
         onBentoNameChange={(name) => {
           if (activeBento) {
@@ -2773,7 +2897,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         onBlocksChange={handleSetBlocks}
       />
 
-      {/* 4. AVATAR CROP MODAL */}
+      {/* 5. AVATAR CROP MODAL */}
       <ImageCropModal
         isOpen={showAvatarCropModal && !!pendingAvatarSrc}
         src={pendingAvatarSrc || ''}
@@ -2811,7 +2935,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
           }}
         />
 
-      {/* 5. AVATAR STYLE MODAL */}
+      {/* 6. AVATAR STYLE MODAL */}
       <AvatarStyleModal
         isOpen={showAvatarStyleModal}
         onClose={() => setShowAvatarStyleModal(false)}

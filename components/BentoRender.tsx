@@ -104,6 +104,8 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
     : { backgroundColor: profile.backgroundColor || (isDark ? '#0b0b0f' : '#f8fafc') };
 
   const avatarStyle = getAvatarStyle(profile.avatarStyle);
+  const nameStyle = profile.nameColor ? { color: profile.nameColor } : undefined;
+  const bioStyle = profile.bioColor ? { color: profile.bioColor } : undefined;
 
   return (
     <div
@@ -146,10 +148,16 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
                 </div>
               </div>
               <div className="space-y-3 w-full max-w-xs">
-                <h1 className={`text-4xl font-bold tracking-tight leading-[1.1] ${headingText}`}>
+                <h1
+                  className={`text-4xl font-bold tracking-tight leading-[1.1] ${headingText}`}
+                  style={nameStyle}
+                >
                   {profile.name}
                 </h1>
-                <p className={`text-base font-medium leading-relaxed whitespace-pre-wrap ${bodyText}`}>
+                <p
+                  className={`text-base font-medium leading-relaxed whitespace-pre-wrap ${bodyText}`}
+                  style={bioStyle}
+                >
                   {profile.bio || '—'}
                 </p>
                 {renderSocialIcons()}
@@ -206,10 +214,14 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
             </div>
             <h1
               className={`text-2xl font-extrabold tracking-tight leading-none mb-2 ${headingText}`}
+              style={nameStyle}
             >
               {profile.name}
             </h1>
-            <p className={`text-sm font-medium whitespace-pre-wrap max-w-xs leading-relaxed ${bodyText}`}>
+            <p
+              className={`text-sm font-medium whitespace-pre-wrap max-w-xs leading-relaxed ${bodyText}`}
+              style={bioStyle}
+            >
               {profile.bio}
             </p>
             {profile.showSocialInHeader && profile.socialAccounts?.length > 0 && (
