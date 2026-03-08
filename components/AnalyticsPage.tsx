@@ -34,7 +34,7 @@ type AnalyticsEvent = {
   language: string | null;
   screen_w: number | null;
   screen_h: number | null;
-  viewport_w: number | null;
+  viewport_w?: number | null;
   viewport_h?: number | null;
   visitor_id: string | null;
   session_id: string | null;
@@ -117,7 +117,7 @@ const AnalyticsPage: React.FC = () => {
         setLoading(false);
       }
     },
-    [days, dbPassword, projectUrl]
+    [days, projectUrl, dbPassword]
   );
 
   // Auto-fetch when config is ready
@@ -125,14 +125,14 @@ const AnalyticsPage: React.FC = () => {
     if (!initialLoading && projectUrl && dbPassword && !isConfigured) {
       fetchAnalytics();
     }
-  }, [dbPassword, fetchAnalytics, initialLoading, isConfigured, projectUrl]);
+  }, [initialLoading, projectUrl, dbPassword, isConfigured, fetchAnalytics]);
 
   // Auto-refresh when days change (if already configured)
   useEffect(() => {
     if (isConfigured && projectUrl && dbPassword) {
       fetchAnalytics(days);
     }
-  }, [days, dbPassword, fetchAnalytics, isConfigured, projectUrl]);
+  }, [days, isConfigured, projectUrl, dbPassword, fetchAnalytics]);
 
   // Compute analytics stats
   const stats = useMemo(() => {

@@ -145,7 +145,6 @@ export const deleteBento = async (id: string): Promise<void> => {
     localStorage.removeItem(ACTIVE_BENTO_KEY);
   }
 };
-
 export const getActiveBentoId = (): string | null => {
   try {
     return localStorage.getItem(ACTIVE_BENTO_KEY);

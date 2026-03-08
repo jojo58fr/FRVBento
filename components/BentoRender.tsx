@@ -1,15 +1,20 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { AvatarStyle, SavedBento, BlockData } from '../types';
+import { BlockType } from '../types';
 import { resolveImageSrc } from '../utils/imageData';
 import Block from './Block';
 import { buildSocialUrl, formatFollowerCount, getSocialPlatformOption } from '../socialPlatforms';
 import { getMobileLayout, MOBILE_GRID_CONFIG } from '../utils/mobileLayout';
+import { ChevronDown } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 interface BentoRenderProps {
   bento: SavedBento;
 }
 
 const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
+  const [expandedCollections, setExpandedCollections] = useState<Record<string, boolean>>({});
+
   // Avatar style helpers
   const getAvatarStyle = (style?: AvatarStyle): React.CSSProperties => {
     const s = style || {
@@ -28,6 +33,7 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
 
   const profile = bento.data.profile;
   const blocks = bento.data.blocks;
+  const pageLayout = profile.pageLayout || 'bento';
   const avatarSrc = resolveImageSrc(profile.avatarUrl);
   const backgroundSrc = resolveImageSrc(profile.backgroundImage);
   const isDark = profile.theme === 'dark';
@@ -47,6 +53,8 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
     };
   };
 
+  const isCollectionBlock = (block: BlockData) => block.type === BlockType.COLLECTION;
+
   // Sort blocks for mobile (by row, then column)
   const sortedBlocks = [...blocks].sort((a, b) => {
     const aRow = a.gridRow ?? 999;
@@ -56,6 +64,19 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
     if (aRow !== bRow) return aRow - bRow;
     return aCol - bCol;
   });
+  const verticalTopLevelBlocks = sortedBlocks.filter((block) => !block.collectionId);
+
+  useEffect(() => {
+    setExpandedCollections((prev) => {
+      const next: Record<string, boolean> = {};
+      blocks.forEach((block) => {
+        if (isCollectionBlock(block)) {
+          next[block.id] = prev[block.id] ?? block.expandedByDefault !== false;
+        }
+      });
+      return next;
+    });
+  }, [blocks]);
 
   // Render social icons
   const renderSocialIcons = () => {
@@ -127,159 +148,155 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
       )}
 
       <div className="relative z-10">
-        {/* Desktop Layout - Matches Builder */}
-        <div className="hidden lg:flex">
-          {/* Fixed Sidebar */}
-          <div className="fixed left-0 top-0 w-[420px] h-screen flex flex-col justify-center items-start px-12 z-10">
-            <div className="flex flex-col items-start text-left">
-              <div className="relative group mb-8">
-                <div className="w-40 h-40 overflow-hidden bg-gray-100" style={avatarStyle}>
-                  {avatarSrc ? (
-                    <img
-                      src={avatarSrc}
-                      alt={profile.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl font-bold">
-                      {profile.name.charAt(0)}
-                    </div>
-                  )}
-                </div>
+        {pageLayout === 'vertical-links' ? (
+          <div className="mx-auto w-full max-w-2xl px-4 pt-8 pb-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-28 h-28 mb-5 overflow-hidden bg-gray-100" style={avatarStyle}>
+                {avatarSrc ? (
+                  <img src={avatarSrc} alt={profile.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-3xl font-bold">
+                    {profile.name.charAt(0)}
+                  </div>
+                )}
               </div>
-              <div className="space-y-3 w-full max-w-xs">
-                <h1
-                  className={`text-4xl font-bold tracking-tight leading-[1.1] ${headingText}`}
-                  style={nameStyle}
-                >
-                  {profile.name}
-                </h1>
-                <p
-                  className={`text-base font-medium leading-relaxed whitespace-pre-wrap ${bodyText}`}
-                  style={bioStyle}
-                >
-                  {profile.bio || '—'}
-                </p>
-                {renderSocialIcons()}
-              </div>
+              <h1
+                className={`text-3xl font-extrabold tracking-tight leading-none mb-2 ${headingText}`}
+                style={nameStyle}
+              >
+                {profile.name}
+              </h1>
+              <p
+                className={`text-sm font-medium whitespace-pre-wrap max-w-md leading-relaxed ${bodyText}`}
+                style={bioStyle}
+              >
+                {profile.bio || '—'}
+              </p>
+              {renderSocialIcons()}
             </div>
-          </div>
 
-          {/* Grid Content */}
-          <div className="ml-[420px] flex-1 p-12 pt-24">
-            <div
-              className="grid gap-2"
-              style={{ gridTemplateColumns: 'repeat(9, 1fr)', gridAutoRows: '64px' }}
-            >
-              {blocks.map((block, index) => (
-                <Block
-                  key={block.id}
-                  block={{ ...applyThemeToBlock(block), zIndex: index + 1 }}
-                  isSelected={false}
-                  isDragTarget={false}
-                  isDragging={false}
-                  enableResize={false}
-                  isResizing={false}
-                  onResizeStart={undefined}
-                  onEdit={() => {}}
-                  onDelete={() => {}}
-                  onDragStart={() => {}}
-                  onDragEnter={() => {}}
-                  onDragEnd={() => {}}
-                  onDrop={() => {}}
-                  enableTiltEffect={true}
-                  previewMode={true}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
+            <div className="mt-6 space-y-4">
+              {verticalTopLevelBlocks.map((block) => {
+                if (isCollectionBlock(block)) {
+                  const children = sortedBlocks.filter((child) => child.collectionId === block.id);
+                  const themedBlock = applyThemeToBlock(block);
+                  const isExpanded =
+                    expandedCollections[block.id] ?? block.expandedByDefault !== false;
 
-        {/* Mobile Layout - Matches Builder mobile preview */}
-        <div className="lg:hidden">
-          {/* Centered Profile */}
-          <div className="p-4 pt-8 flex flex-col items-center text-center">
-            <div className="w-24 h-24 mb-4 overflow-hidden bg-gray-100" style={avatarStyle}>
-              {avatarSrc ? (
-                <img
-                  src={avatarSrc}
-                  alt={profile.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl font-bold">
-                  {profile.name.charAt(0)}
-                </div>
-              )}
-            </div>
-            <h1
-              className={`text-2xl font-extrabold tracking-tight leading-none mb-2 ${headingText}`}
-              style={nameStyle}
-            >
-              {profile.name}
-            </h1>
-            <p
-              className={`text-sm font-medium whitespace-pre-wrap max-w-xs leading-relaxed ${bodyText}`}
-              style={bioStyle}
-            >
-              {profile.bio}
-            </p>
-            {profile.showSocialInHeader && profile.socialAccounts?.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-3 mt-4">
-                {profile.socialAccounts.map((account) => {
-                  const option = getSocialPlatformOption(account.platform);
-                  if (!option) return null;
-                  const BrandIcon = option.brandIcon;
-                  const FallbackIcon = option.icon;
-                  const url = buildSocialUrl(account.platform, account.handle);
-                  const showCount = profile.showFollowerCount && account.followerCount;
                   return (
-                    <a
-                      key={account.platform}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`${showCount ? 'px-3 py-2' : 'w-10 h-10'} ${socialBg} rounded-full shadow-md flex items-center justify-center gap-2 font-semibold transition-transform hover:-translate-y-0.5`}
-                      title={option.label}
+                    <div
+                      key={block.id}
+                      className={`rounded-[1.1rem] border overflow-hidden shadow-sm ${
+                        isDark ? 'border-gray-800' : 'border-gray-200'
+                      } ${themedBlock.color || (isDark ? 'bg-gray-900' : 'bg-white')} ${
+                        themedBlock.textColor || (isDark ? 'text-gray-100' : 'text-gray-900')
+                      }`}
+                      style={
+                        themedBlock.customBackground
+                          ? { background: themedBlock.customBackground }
+                          : undefined
+                      }
                     >
-                      <span style={{ color: option.brandColor }}>
-                        {BrandIcon ? <BrandIcon size={20} /> : <FallbackIcon size={20} />}
-                      </span>
-                      {showCount && (
-                        <span className={`text-sm font-semibold ${socialCountText}`}>
-                          {formatFollowerCount(account.followerCount)}
-                        </span>
-                      )}
-                    </a>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedCollections((prev) => ({
+                            ...prev,
+                            [block.id]: !isExpanded,
+                          }))
+                        }
+                        className="w-full flex items-center justify-between px-4 py-4 text-left"
+                      >
+                        <p className="text-sm font-bold">{block.title || 'Collection'}</p>
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform ${isDark ? 'text-gray-400' : 'text-gray-500'} ${
+                            isExpanded ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.22, ease: 'easeInOut' }}
+                            className="overflow-hidden"
+                          >
+                            <div
+                              className={`px-4 pb-4 space-y-3 border-t ${
+                                isDark
+                                  ? 'border-gray-800 bg-black/10'
+                                  : 'border-gray-100 bg-gray-50/80'
+                              }`}
+                            >
+                              {children.map((child) => {
+                                const normalizedChild =
+                                  child.type === BlockType.SOCIAL_ICON
+                                    ? { ...applyThemeToBlock(child), colSpan: 9, rowSpan: 2 }
+                                    : {
+                                        ...applyThemeToBlock(child),
+                                        colSpan: 9,
+                                        gridColumn: undefined,
+                                        gridRow: undefined,
+                                      };
+                                const childHeight = Math.max(96, Math.min(320, child.rowSpan * 64));
 
-          {/* Mobile Grid - 2 columns adaptive */}
-          <div className="p-4">
-            <div
-              className="grid pb-8"
-              style={{
-                gridTemplateColumns: `repeat(${MOBILE_GRID_CONFIG.columns}, 1fr)`,
-                gridAutoRows: `${MOBILE_GRID_CONFIG.rowHeight}px`,
-                gap: `${MOBILE_GRID_CONFIG.gap}px`,
-              }}
-            >
-              {sortedBlocks.map((block) => {
-                const mobileLayout = getMobileLayout(block);
+                                return (
+                                  <div
+                                    key={child.id}
+                                    style={{ height: `${childHeight}px` }}
+                                    className="pt-3"
+                                  >
+                                    <Block
+                                      block={{
+                                        ...normalizedChild,
+                                        gridColumn: undefined,
+                                        gridRow: undefined,
+                                      }}
+                                      isSelected={false}
+                                      isDragTarget={false}
+                                      isDragging={false}
+                                      enableResize={false}
+                                      isResizing={false}
+                                      onResizeStart={undefined}
+                                      onEdit={() => {}}
+                                      onDelete={() => {}}
+                                      onDragStart={() => {}}
+                                      onDragEnter={() => {}}
+                                      onDragEnd={() => {}}
+                                      onDrop={() => {}}
+                                      enableTiltEffect={true}
+                                      previewMode={true}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                }
+
+                const normalizedBlock =
+                  block.type === BlockType.SOCIAL_ICON
+                    ? { ...applyThemeToBlock(block), colSpan: 9, rowSpan: 2 }
+                    : {
+                        ...applyThemeToBlock(block),
+                        colSpan: 9,
+                        gridColumn: undefined,
+                        gridRow: undefined,
+                      };
+                const blockHeight = Math.max(96, Math.min(320, block.rowSpan * 64));
+
                 return (
-                  <div
-                    key={block.id}
-                    style={{
-                      gridColumn: `span ${mobileLayout.colSpan}`,
-                      gridRow: `span ${mobileLayout.rowSpan}`,
-                    }}
-                  >
+                  <div key={block.id} style={{ height: `${blockHeight}px` }}>
                     <Block
                       block={{
-                        ...applyThemeToBlock(block),
+                        ...normalizedBlock,
                         gridColumn: undefined,
                         gridRow: undefined,
                       }}
@@ -303,7 +320,181 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
               })}
             </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="hidden lg:flex">
+              <div className="fixed left-0 top-0 w-[420px] h-screen flex flex-col justify-center items-start px-12 z-10">
+                <div className="flex flex-col items-start text-left">
+                  <div className="relative group mb-8">
+                    <div className="w-40 h-40 overflow-hidden bg-gray-100" style={avatarStyle}>
+                      {avatarSrc ? (
+                        <img
+                          src={avatarSrc}
+                          alt={profile.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl font-bold">
+                          {profile.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-3 w-full max-w-xs">
+                    <h1
+                      className={`text-4xl font-bold tracking-tight leading-[1.1] ${headingText}`}
+                      style={nameStyle}
+                    >
+                      {profile.name}
+                    </h1>
+                    <p
+                      className={`text-base font-medium leading-relaxed whitespace-pre-wrap ${bodyText}`}
+                      style={bioStyle}
+                    >
+                      {profile.bio || '—'}
+                    </p>
+                    {renderSocialIcons()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="ml-[420px] flex-1 p-12 pt-24">
+                <div
+                  className="grid gap-2"
+                  style={{ gridTemplateColumns: 'repeat(9, 1fr)', gridAutoRows: '64px' }}
+                >
+                  {blocks.map((block, index) => (
+                    <Block
+                      key={block.id}
+                      block={{ ...applyThemeToBlock(block), zIndex: index + 1 }}
+                      isSelected={false}
+                      isDragTarget={false}
+                      isDragging={false}
+                      enableResize={false}
+                      isResizing={false}
+                      onResizeStart={undefined}
+                      onEdit={() => {}}
+                      onDelete={() => {}}
+                      onDragStart={() => {}}
+                      onDragEnter={() => {}}
+                      onDragEnd={() => {}}
+                      onDrop={() => {}}
+                      enableTiltEffect={true}
+                      previewMode={true}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:hidden">
+              <div className="p-4 pt-8 flex flex-col items-center text-center">
+                <div className="w-24 h-24 mb-4 overflow-hidden bg-gray-100" style={avatarStyle}>
+                  {avatarSrc ? (
+                    <img
+                      src={avatarSrc}
+                      alt={profile.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl font-bold">
+                      {profile.name.charAt(0)}
+                    </div>
+                  )}
+                </div>
+                <h1
+                  className={`text-2xl font-extrabold tracking-tight leading-none mb-2 ${headingText}`}
+                  style={nameStyle}
+                >
+                  {profile.name}
+                </h1>
+                <p
+                  className={`text-sm font-medium whitespace-pre-wrap max-w-xs leading-relaxed ${bodyText}`}
+                  style={bioStyle}
+                >
+                  {profile.bio}
+                </p>
+                {profile.showSocialInHeader && profile.socialAccounts?.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-3 mt-4">
+                    {profile.socialAccounts.map((account) => {
+                      const option = getSocialPlatformOption(account.platform);
+                      if (!option) return null;
+                      const BrandIcon = option.brandIcon;
+                      const FallbackIcon = option.icon;
+                      const url = buildSocialUrl(account.platform, account.handle);
+                      const showCount = profile.showFollowerCount && account.followerCount;
+                      return (
+                        <a
+                          key={account.platform}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`${showCount ? 'px-3 py-2' : 'w-10 h-10'} ${socialBg} rounded-full shadow-md flex items-center justify-center gap-2 font-semibold transition-transform hover:-translate-y-0.5`}
+                          title={option.label}
+                        >
+                          <span style={{ color: option.brandColor }}>
+                            {BrandIcon ? <BrandIcon size={20} /> : <FallbackIcon size={20} />}
+                          </span>
+                          {showCount && (
+                            <span className={`text-sm font-semibold ${socialCountText}`}>
+                              {formatFollowerCount(account.followerCount)}
+                            </span>
+                          )}
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4">
+                <div
+                  className="grid pb-8"
+                  style={{
+                    gridTemplateColumns: `repeat(${MOBILE_GRID_CONFIG.columns}, 1fr)`,
+                    gridAutoRows: `${MOBILE_GRID_CONFIG.rowHeight}px`,
+                    gap: `${MOBILE_GRID_CONFIG.gap}px`,
+                  }}
+                >
+                  {sortedBlocks.map((block) => {
+                    const mobileLayout = getMobileLayout(block);
+                    return (
+                      <div
+                        key={block.id}
+                        style={{
+                          gridColumn: `span ${mobileLayout.colSpan}`,
+                          gridRow: `span ${mobileLayout.rowSpan}`,
+                        }}
+                      >
+                        <Block
+                          block={{
+                            ...applyThemeToBlock(block),
+                            gridColumn: undefined,
+                            gridRow: undefined,
+                          }}
+                          isSelected={false}
+                          isDragTarget={false}
+                          isDragging={false}
+                          enableResize={false}
+                          isResizing={false}
+                          onResizeStart={undefined}
+                          onEdit={() => {}}
+                          onDelete={() => {}}
+                          onDragStart={() => {}}
+                          onDragEnter={() => {}}
+                          onDragEnd={() => {}}
+                          onDrop={() => {}}
+                          enableTiltEffect={true}
+                          previewMode={true}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Footer */}
         {profile.showBranding !== false && (

@@ -22,6 +22,7 @@ import {
   Palette,
   CheckCircle2,
   Droplets,
+  FolderTree,
 } from 'lucide-react';
 import {
   buildSocialUrl,
@@ -36,6 +37,7 @@ import { prepareImageData, resolveImageSrc } from '../utils/imageData';
 
 interface EditorSidebarProps {
   profile: UserProfile;
+  blocks: BlockData[];
   addBlock: (type: BlockType) => void;
   editingBlock: BlockData | null;
   updateBlock: (b: BlockData) => void;
@@ -46,6 +48,7 @@ interface EditorSidebarProps {
 
 const EditorSidebar: React.FC<EditorSidebarProps> = ({
   profile,
+  blocks,
   addBlock,
   editingBlock,
   updateBlock,
@@ -132,6 +135,9 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
   const resolvedSocialOption = getSocialPlatformOption(resolvedSocialPlatform);
   const resolvedSocialUrl = buildSocialUrl(resolvedSocialPlatform, resolvedSocialHandle);
+  const availableCollections = blocks.filter(
+    (block) => block.type === BlockType.COLLECTION && block.id !== editingBlock?.id
+  );
 
   const getContrastTextClass = (hexColor: string) => {
     const sanitized = hexColor.replace('#', '');
@@ -385,6 +391,42 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     />
                   </div>
                 )}
+
+              {editingBlock.type === BlockType.COLLECTION && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl">
+                    <label className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">Expanded by default</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Controls whether the collection is open on first load.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        aria-pressed={editingBlock.expandedByDefault !== false}
+                        onClick={() =>
+                          updateBlock({
+                            ...editingBlock,
+                            expandedByDefault: editingBlock.expandedByDefault === false,
+                          })
+                        }
+                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                          editingBlock.expandedByDefault !== false ? 'bg-gray-900' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                            editingBlock.expandedByDefault !== false
+                              ? 'translate-x-6'
+                              : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* 2a. SOCIAL_ICON BLOCK: Simple platform + handle */}
               {editingBlock.type === BlockType.SOCIAL_ICON && (
@@ -953,6 +995,33 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                   />
                 </div>
               )}
+
+              {profile.pageLayout === 'vertical-links' &&
+                editingBlock.type !== BlockType.COLLECTION &&
+                editingBlock.type !== BlockType.SPACER && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                      Collection
+                    </label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 focus:ring-2 focus:ring-black/5 focus:border-black focus:outline-none transition-all font-medium text-gray-600"
+                      value={editingBlock.collectionId || ''}
+                      onChange={(e) =>
+                        updateBlock({
+                          ...editingBlock,
+                          collectionId: e.target.value || undefined,
+                        })
+                      }
+                    >
+                      <option value="">No collection</option>
+                      {availableCollections.map((collection) => (
+                        <option key={collection.id} value={collection.id}>
+                          {collection.title || 'Untitled Collection'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
             </div>
 
             {/* Appearance (Colors) */}
@@ -1083,6 +1152,16 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     color: 'bg-indigo-600',
                   },
                   { type: BlockType.MAP, label: 'Map', icon: MapPin, color: 'bg-amber-500' },
+                  ...(profile.pageLayout === 'vertical-links'
+                    ? [
+                        {
+                          type: BlockType.COLLECTION,
+                          label: 'Collection',
+                          icon: FolderTree,
+                          color: 'bg-slate-700',
+                        },
+                      ]
+                    : []),
                   {
                     type: BlockType.SPACER,
                     label: 'Spacer',

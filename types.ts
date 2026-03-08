@@ -4,6 +4,7 @@ export enum BlockType {
   FLUID_TEXT = 'FLUID_TEXT',
   MEDIA = 'MEDIA', // Images, GIFs, videos
   SOCIAL = 'SOCIAL',
+  COLLECTION = 'COLLECTION',
   SOCIAL_ICON = 'SOCIAL_ICON', // Small icon-only social block for 9x9 grid
   MAP = 'MAP',
   SPACER = 'SPACER',
@@ -76,6 +77,8 @@ export interface BlockData {
   // Social platform (non-YouTube mode)
   socialPlatform?: SocialPlatform;
   socialHandle?: string; // Stored without leading '@' when possible
+  collectionId?: string;
+  expandedByDefault?: boolean;
 
   // Z-index for overlapping blocks (runtime only, not saved)
   zIndex?: number;
@@ -109,6 +112,7 @@ export interface UserProfile {
   bio: string;
   avatarUrl: string | ImageData;
   avatarStyle?: AvatarStyle; // Profile picture style options
+  pageLayout?: 'bento' | 'vertical-links';
   theme: 'light' | 'dark';
   primaryColor: string;
   customCss?: string;

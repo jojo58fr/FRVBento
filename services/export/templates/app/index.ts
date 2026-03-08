@@ -13,6 +13,7 @@ import { generateBlockComponent } from './blockComponent';
 import {
   generateDesktopLayout,
   generateMobileLayout,
+  generateVerticalLinksLayout,
   generateMobileLayoutHelper,
   generateFooter,
   generateBackgroundBlur,
@@ -101,10 +102,20 @@ const sortedBlocks = [...blocks].sort((a, b) => {
   if (aRow !== bRow) return aRow - bRow
   return aCol - bCol
 })
+const topLevelVerticalBlocks = blocks.filter(block => !block.collectionId)
+const getCollectionChildren = (collectionId: string) => blocks.filter(block => block.collectionId === collectionId)
 
 export default function App() {
   useAnalytics()
 
+  const pageLayout = profile.pageLayout || 'bento'
+  const [expandedCollections, setExpandedCollections] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      blocks
+        .filter(block => block.type === BlockType.COLLECTION)
+        .map(block => [block.id, block.expandedByDefault !== false])
+    )
+  )
   const avatarStyle = { borderRadius: '${avatarRadius}', boxShadow: '${avatarShadow}', border: '${avatarBorder}' }
   const bgStyle: React.CSSProperties = ${bgStyle}
   const customCss = profile.customCss || ''
@@ -114,9 +125,15 @@ export default function App() {
       {customCss ? <style>{customCss}</style> : null}
       ${generateBackgroundBlur(backgroundSrc, profile.backgroundBlur)}
       <div className="relative z-10">
+        {pageLayout === 'vertical-links' ? (
+${generateVerticalLinksLayout(layoutParams)}
+        ) : (
+          <>
 ${generateDesktopLayout(layoutParams)}
 
 ${generateMobileLayout(layoutParams)}
+          </>
+        )}
 
 ${generateFooter(layoutParams.showBranding)}
       </div>
