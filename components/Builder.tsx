@@ -2444,6 +2444,18 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                     <Smartphone size={16} />
                   </button>
                 </div>
+                <button
+                  type="button"
+                  aria-label="Change page layout"
+                  onClick={() => setShowLayoutModal(true)}
+                  className="ml-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {selectedPageLayout === 'bento' ? <Layout size={16} /> : <List size={16} />}
+                  <span className="hidden sm:inline">
+                    {selectedPageLayout === 'bento' ? 'Bento' : 'Vertical Links'}
+                  </span>
+                  <ChevronDown size={14} className="text-gray-400" />
+                </button>
               </div>
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium pointer-events-auto">
                 <Globe
@@ -2478,18 +2490,6 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                     : 'Not published'}
                 </span>
               </div>
-              <button
-                type="button"
-                aria-label="Change page layout"
-                onClick={() => setShowLayoutModal(true)}
-                className="ml-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {selectedPageLayout === 'bento' ? <Layout size={16} /> : <List size={16} />}
-                <span className="hidden sm:inline">
-                  {selectedPageLayout === 'bento' ? 'Bento' : 'Vertical Links'}
-                </span>
-                <ChevronDown size={14} className="text-gray-400" />
-              </button>
             </div>
 
             {/* Actions Pill */}
@@ -2917,22 +2917,40 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                             onChange={(e) => setTempName(e.target.value)}
                             onBlur={saveNameEdit}
                             onKeyDown={handleNameKeyDown}
-                            className="text-3xl font-extrabold tracking-tight text-gray-900 bg-transparent border-b-2 border-violet-500 outline-none text-center w-full max-w-md leading-none mb-2"
+                            className={`text-3xl font-extrabold tracking-tight bg-transparent border-b-2 border-violet-500 outline-none text-center w-full max-w-md leading-none mb-2 ${headingText}`}
+                            style={profileNameStyle}
                             placeholder="Your name"
                           />
                         ) : (
-                          <div
-                            className={`flex items-center gap-2 mb-2 ${viewMode === 'desktop' ? 'group cursor-pointer' : ''}`}
-                            onClick={viewMode === 'desktop' ? startEditingName : undefined}
-                          >
-                            <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 leading-none">
+                          <div className="group relative mb-2 flex w-full items-center justify-center text-center">
+                            <h1
+                              className={`text-3xl font-extrabold tracking-tight leading-none ${headingText} ${
+                                viewMode === 'desktop' ? nameHover : ''
+                              } ${viewMode === 'desktop' ? 'cursor-pointer transition-colors' : ''}`}
+                              style={profileNameStyle}
+                              onClick={viewMode === 'desktop' ? startEditingName : undefined}
+                            >
                               {profile.name}
                             </h1>
                             {viewMode === 'desktop' && (
-                              <Pencil
-                                size={16}
-                                className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                              />
+                              <div className="absolute left-1/2 ml-[calc(min(50vw,20rem)/2+0.5rem)] flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  aria-label="Edit name color"
+                                  onClick={() => setTextColorTarget('name')}
+                                  className="p-1 rounded-full hover:bg-white/70 transition-colors"
+                                >
+                                  <Palette size={15} className="text-gray-400" />
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label="Edit your name"
+                                  onClick={startEditingName}
+                                  className="p-1 rounded-full hover:bg-white/70 transition-colors"
+                                >
+                                  <Pencil size={16} className="text-gray-300" />
+                                </button>
+                              </div>
                             )}
                           </div>
                         )}
@@ -2945,23 +2963,45 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                             onChange={(e) => setTempBio(e.target.value)}
                             onBlur={saveBioEdit}
                             onKeyDown={handleBioKeyDown}
-                            className="text-sm text-gray-500 font-medium whitespace-pre-wrap max-w-md leading-relaxed bg-transparent border-b-2 border-violet-500 outline-none w-full text-center resize-none"
+                            className={`text-sm font-medium whitespace-pre-wrap max-w-md leading-relaxed bg-transparent border-b-2 border-violet-500 outline-none w-full text-center resize-none ${bodyText}`}
+                            style={profileBioStyle}
                             rows={3}
                             placeholder="Write something about yourself..."
                           />
                         ) : (
-                          <p
-                            className={`text-sm text-gray-500 font-medium whitespace-pre-wrap max-w-md leading-relaxed ${viewMode === 'desktop' ? 'group cursor-pointer hover:text-gray-700 transition-colors flex items-start justify-center gap-2' : ''}`}
-                            onClick={viewMode === 'desktop' ? startEditingBio : undefined}
-                          >
-                            <span>{profile.bio || 'Click to add bio...'}</span>
+                          <div className="group relative flex w-full items-start justify-center text-center">
+                            <p
+                              className={`text-sm font-medium whitespace-pre-wrap max-w-md leading-relaxed text-center ${bodyText} ${
+                                viewMode === 'desktop'
+                                  ? `${isDark ? 'hover:text-gray-200' : 'hover:text-gray-700'} cursor-pointer transition-colors`
+                                  : ''
+                              }`}
+                              style={profileBioStyle}
+                              onClick={viewMode === 'desktop' ? startEditingBio : undefined}
+                            >
+                              {profile.bio || 'Click to add bio...'}
+                            </p>
                             {viewMode === 'desktop' && (
-                              <Pencil
-                                size={14}
-                                className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 shrink-0"
-                              />
+                              <div className="absolute left-1/2 top-0 ml-[calc(min(50vw,20rem)/2+0.5rem)] mt-0.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  aria-label="Edit bio color"
+                                  onClick={() => setTextColorTarget('bio')}
+                                  className="p-1 rounded-full hover:bg-white/70 transition-colors"
+                                >
+                                  <Palette size={14} className="text-gray-400" />
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label="Edit your bio"
+                                  onClick={startEditingBio}
+                                  className="p-1 rounded-full hover:bg-white/70 transition-colors"
+                                >
+                                  <Pencil size={14} className="text-gray-300" />
+                                </button>
+                              </div>
                             )}
-                          </p>
+                          </div>
                         )}
                         {profile.showSocialInHeader &&
                           profile.socialAccounts &&
@@ -2981,7 +3021,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                     href={url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className={`${showCount ? 'px-3 py-2' : 'w-10 h-10'} bg-white rounded-full shadow-md flex items-center justify-center gap-2 font-semibold text-gray-900 transition-transform hover:-translate-y-0.5`}
+                                    className={`${showCount ? 'px-3 py-2' : 'w-10 h-10'} ${socialBg} rounded-full shadow-md flex items-center justify-center gap-2 font-semibold transition-transform hover:-translate-y-0.5`}
                                     title={option.label}
                                   >
                                     {BrandIcon ? (
@@ -2989,12 +3029,12 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                         <BrandIcon size={20} />
                                       </span>
                                     ) : (
-                                      <span className="text-gray-600">
+                                      <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>
                                         <FallbackIcon size={20} />
                                       </span>
                                     )}
                                     {showCount && (
-                                      <span className="text-sm font-semibold text-gray-900">
+                                      <span className={`text-sm font-semibold ${socialCountText}`}>
                                         {formatFollowerCount(account.followerCount)}
                                       </span>
                                     )}
@@ -3092,16 +3132,19 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                 const isExpanded =
                                   expandedCollections[block.id] ??
                                   block.expandedByDefault !== false;
+                                const themedBlock = applyThemeToBlock(block);
 
                                 return (
                                   <div
                                     key={block.id}
-                                    className={`rounded-[1.1rem] border border-gray-200 ${block.color || 'bg-white'} ${
-                                      block.textColor || 'text-gray-900'
+                                    className={`rounded-[1.1rem] border ${
+                                      isDark ? 'border-gray-800' : 'border-gray-200'
+                                    } ${themedBlock.color || (isDark ? 'bg-gray-900' : 'bg-white')} ${
+                                      themedBlock.textColor || (isDark ? 'text-gray-100' : 'text-gray-900')
                                     } shadow-sm overflow-hidden`}
                                     style={
-                                      block.customBackground
-                                        ? { background: block.customBackground }
+                                      themedBlock.customBackground
+                                        ? { background: themedBlock.customBackground }
                                         : undefined
                                     }
                                   >
@@ -3120,7 +3163,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                       </p>
                                       <ChevronDown
                                         size={16}
-                                        className={`text-gray-500 transition-transform ${
+                                        className={`transition-transform ${isDark ? 'text-gray-400' : 'text-gray-500'} ${
                                           isExpanded ? 'rotate-180' : ''
                                         }`}
                                       />
@@ -3134,13 +3177,23 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                           transition={{ duration: 0.22, ease: 'easeInOut' }}
                                           className="overflow-hidden"
                                         >
-                                          <div className="px-4 pb-4 space-y-3 border-t border-gray-100 bg-gray-50/80">
+                                          <div
+                                            className={`px-4 pb-4 space-y-3 border-t ${
+                                              isDark
+                                                ? 'border-gray-800 bg-black/10'
+                                                : 'border-gray-100 bg-gray-50/80'
+                                            }`}
+                                          >
                                             {children.map((child) => {
                                               const normalizedChild =
                                                 child.type === BlockType.SOCIAL_ICON
-                                                  ? { ...child, colSpan: 9, rowSpan: 2 }
+                                                  ? {
+                                                      ...applyThemeToBlock(child),
+                                                      colSpan: 9,
+                                                      rowSpan: 2,
+                                                    }
                                                   : {
-                                                      ...child,
+                                                      ...applyThemeToBlock(child),
                                                       colSpan: 9,
                                                       gridColumn: undefined,
                                                       gridRow: undefined,
@@ -3192,9 +3245,9 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
 
                               const normalizedBlock =
                                 block.type === BlockType.SOCIAL_ICON
-                                  ? { ...block, colSpan: 9, rowSpan: 2 }
+                                  ? { ...applyThemeToBlock(block), colSpan: 9, rowSpan: 2 }
                                   : {
-                                      ...block,
+                                      ...applyThemeToBlock(block),
                                       colSpan: 9,
                                       gridColumn: undefined,
                                       gridRow: undefined,
