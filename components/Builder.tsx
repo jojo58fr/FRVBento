@@ -65,8 +65,6 @@ import {
   Pencil,
   Palette,
   Sparkles,
-  Save,
-  AlertCircle,
   LogIn,
   LogOut,
   UserCircle,
@@ -2373,7 +2371,6 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                     <Home size={16} />
                   </button>
                 )}
-                <span className="font-bold text-gray-800 tracking-tight px-1">OpenBento</span>
                 <div className="h-6 w-px bg-gray-200 mx-1"></div>
                 {/* Profile Dropdown */}
                 {activeBento && (
@@ -2384,45 +2381,39 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                   />
                 )}
                 <div className="h-6 w-px bg-gray-200 mx-1"></div>
-                {/* Save Button with Status */}
-                <button
-                  type="button"
-                  aria-label="Save (Ctrl+S)"
-                  onClick={handleManualSave}
-                  disabled={saveStatus === 'saving'}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 disabled:opacity-50"
-                  title={
-                    saveStatus === 'error' && saveError
-                      ? `Save error: ${saveError}`
-                      : 'Save (Ctrl+S)'
-                  }
-                >
-                  {saveStatus === 'saving' ? (
-                    <>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                        className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full"
-                      />
-                      <span className="text-gray-600">Saving…</span>
-                    </>
-                  ) : saveStatus === 'saved' ? (
-                    <>
-                      <Check size={16} className="text-green-500" />
-                      <span className="text-green-600">Saved local</span>
-                    </>
-                  ) : saveStatus === 'error' ? (
-                    <>
-                      <AlertCircle size={16} className="text-red-500" />
-                      <span className="text-red-600">Error</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save size={16} className="text-gray-500" />
-                      <span className="text-gray-500">{lastSavedAt ? timeAgo : 'Not saved'}</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium pointer-events-auto">
+                  <Globe
+                    size={16}
+                    className={
+                      profile.publicSlug
+                        ? !canPublishPublicUrl
+                          ? 'text-amber-600'
+                          : isPublishedSyncing
+                            ? 'text-amber-600'
+                            : 'text-emerald-600'
+                        : 'text-red-600'
+                    }
+                  />
+                  <span
+                    className={
+                      profile.publicSlug
+                        ? !canPublishPublicUrl
+                          ? 'text-amber-600'
+                          : isPublishedSyncing
+                            ? 'text-amber-600'
+                            : 'text-emerald-600'
+                        : 'text-red-600'
+                    }
+                  >
+                    {profile.publicSlug
+                      ? !canPublishPublicUrl
+                        ? 'Connexion requise'
+                        : isPublishedSyncing
+                          ? "En cours d'envoi"
+                          : 'Published'
+                      : 'Not published'}
+                  </span>
+                </div>
                 <div className="h-6 w-px bg-gray-200 mx-1"></div>
                 <div className="flex bg-gray-100/80 p-1 rounded-xl gap-0.5">
                   <button
@@ -2456,39 +2447,6 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                   </span>
                   <ChevronDown size={14} className="text-gray-400" />
                 </button>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium pointer-events-auto">
-                <Globe
-                  size={16}
-                  className={
-                    profile.publicSlug
-                      ? !canPublishPublicUrl
-                        ? 'text-amber-600'
-                        : isPublishedSyncing
-                          ? 'text-amber-600'
-                          : 'text-emerald-600'
-                      : 'text-red-600'
-                  }
-                />
-                <span
-                  className={
-                    profile.publicSlug
-                      ? !canPublishPublicUrl
-                        ? 'text-amber-600'
-                        : isPublishedSyncing
-                          ? 'text-amber-600'
-                          : 'text-emerald-600'
-                      : 'text-red-600'
-                  }
-                >
-                  {profile.publicSlug
-                    ? !canPublishPublicUrl
-                      ? 'Connexion requise'
-                      : isPublishedSyncing
-                        ? "En cours d'envoi"
-                        : 'Published'
-                    : 'Not published'}
-                </span>
               </div>
             </div>
 
@@ -3831,6 +3789,10 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         onImportJson={handleImportJSON}
         blocks={blocks}
         onBlocksChange={handleSetBlocks}
+        onBentoImported={(newBento) => {
+          handleBentoChange(newBento);
+          setShowSettingsModal(false);
+        }}
       />
 
       <AnimatePresence>
@@ -3983,11 +3945,8 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         isOpen={showAIGeneratorModal}
         onClose={() => setShowAIGeneratorModal(false)}
         onBentoImported={(newBento) => {
-          // Reload the app with the new bento
-          setActiveBento(newBento);
-          handleSetProfile(newBento.data.profile);
-          handleSetBlocks(newBento.data.blocks);
-          setGridVersion(newBento.data.gridVersion ?? GRID_VERSION);
+          handleBentoChange(newBento);
+          setShowAIGeneratorModal(false);
         }}
       />
 
