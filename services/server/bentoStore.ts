@@ -50,6 +50,7 @@ const normalizeProfile = (profile?: UserProfile): UserProfile => ({
   name: profile?.name || 'My Bento',
   bio: profile?.bio || 'Digital creator & developer.\nBuilding awesome things.',
   avatarUrl: profile?.avatarUrl || AVATAR_PLACEHOLDER,
+  pageLayout: profile?.pageLayout,
   theme: profile?.theme || 'light',
   primaryColor: profile?.primaryColor || 'blue',
   customCss: profile?.customCss || '',
