@@ -45,6 +45,7 @@ export interface SocialAccount {
   platform: SocialPlatform;
   handle: string; // Username/handle without @ or full URL for url-type platforms
   followerCount?: number; // Optional follower/subscriber count
+  followerCountMode?: 'manual' | 'auto'; // Manual entry or automatic sync when supported
 }
 
 export interface MediaGalleryItem {

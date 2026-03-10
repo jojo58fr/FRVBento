@@ -30,6 +30,12 @@ import {
   formatFollowerCount,
 } from '../socialPlatforms';
 import { importLinktreeToBento } from '../services/linktreeImportService';
+import { useSocialFollowerCounts } from '../hooks/useSocialFollowerCounts';
+import {
+  getDisplayFollowerCount,
+  getFollowerCountMode,
+  supportsAutoFollowerCount,
+} from '../services/socialFollowerCounts';
 
 const ENABLE_IMPORT =
   process.env.NEXT_PUBLIC_ENABLE_IMPORT === 'true' || process.env.VITE_ENABLE_IMPORT === 'true';
@@ -209,6 +215,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const socialAccounts = profile.socialAccounts || [];
+  const { counts: autoFollowerCounts, loading: autoFollowerLoading, errors: autoFollowerErrors } =
+    useSocialFollowerCounts(socialAccounts);
 
   // Update JSON text when modal opens or data changes
   useEffect(() => {
@@ -267,6 +275,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       ...profile,
       socialAccounts: socialAccounts.map((acc) =>
         acc.platform === platform ? { ...acc, followerCount: numCount } : acc
+      ),
+    });
+  };
+
+  const updateFollowerCountMode = (platform: SocialPlatform, followerCountMode: 'manual' | 'auto') => {
+    setProfile({
+      ...profile,
+      socialAccounts: socialAccounts.map((acc) =>
+        acc.platform === platform ? { ...acc, followerCountMode } : acc
       ),
     });
   };
@@ -1099,13 +1116,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       const BrandIcon = option.brandIcon;
                       const FallbackIcon = option.icon;
                       const url = buildSocialUrl(account.platform, account.handle);
+                      const countMode = getFollowerCountMode(account);
+                      const autoSupported = supportsAutoFollowerCount(account.platform);
+                      const liveFollowerCount = getDisplayFollowerCount(
+                        account,
+                        autoFollowerCounts[account.platform]
+                      );
+                      const isAutoLoading = !!autoFollowerLoading[account.platform];
+                      const autoError = autoFollowerErrors[account.platform];
                       const canMoveUp = index > 0;
                       const canMoveDown = index < socialAccounts.length - 1;
 
                       return (
                         <div
                           key={account.platform}
-                          className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl group"
+                          className="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-xl group"
                         >
                           <div className="flex shrink-0 flex-col gap-1">
                             <button
@@ -1148,23 +1173,50 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                               placeholder={option.placeholder}
                               className="w-full text-xs text-gray-500 bg-transparent border-none p-0 focus:outline-none focus:ring-0"
                             />
+                            <div className="mt-2 flex items-center gap-2">
+                              <label className="inline-flex items-center gap-2 text-[11px] font-medium text-gray-500">
+                                <input
+                                  type="checkbox"
+                                  checked={countMode === 'auto'}
+                                  disabled={!autoSupported}
+                                  onChange={(e) =>
+                                    updateFollowerCountMode(
+                                      account.platform,
+                                      e.target.checked ? 'auto' : 'manual'
+                                    )
+                                  }
+                                  className="h-3.5 w-3.5 rounded border-gray-300 text-violet-600 focus:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                                Auto update
+                              </label>
+                              <span className="text-[11px] text-gray-400">
+                                {autoSupported
+                                  ? 'GitHub, Bluesky, YouTube, Instagram, TikTok'
+                                  : 'Not available'}
+                              </span>
+                            </div>
                           </div>
-                          <div className="shrink-0 w-20">
+                          <div className="shrink-0 w-28">
                             <input
                               type="text"
                               aria-label={`${option.label} follower count`}
-                              value={account.followerCount || ''}
+                              value={account.followerCount ?? ''}
                               onChange={(e) =>
                                 updateFollowerCount(account.platform, e.target.value)
                               }
-                              placeholder="Followers"
-                              className="w-full text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-right focus:outline-none focus:ring-1 focus:ring-violet-500"
+                              placeholder={countMode === 'auto' ? 'Auto' : 'Followers'}
+                              disabled={countMode === 'auto'}
+                              className="w-full text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-right focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:bg-gray-100 disabled:text-gray-400"
                             />
-                            {account.followerCount && (
-                              <p className="text-[9px] text-gray-400 text-right mt-0.5">
-                                {formatFollowerCount(account.followerCount)}
-                              </p>
-                            )}
+                            <p className="text-[9px] text-gray-400 text-right mt-0.5 min-h-[14px]">
+                              {countMode === 'auto' && isAutoLoading
+                                ? 'Syncing...'
+                                : countMode === 'auto' && autoError
+                                  ? autoError
+                                  : typeof liveFollowerCount === 'number'
+                                    ? formatFollowerCount(liveFollowerCount)
+                                    : ''}
+                            </p>
                           </div>
                           {url && (
                             <a
