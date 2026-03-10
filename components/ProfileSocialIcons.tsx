@@ -1,6 +1,8 @@
 import React from 'react';
 import type { SocialIconStyle, UserProfile } from '../types';
 import { buildSocialUrl, formatFollowerCount, getSocialPlatformOption } from '../socialPlatforms';
+import { useSocialFollowerCounts } from '../hooks/useSocialFollowerCounts';
+import { getDisplayFollowerCount } from '../services/socialFollowerCounts';
 
 type ProfileSocialIconsProps = {
   profile: UserProfile;
@@ -48,7 +50,10 @@ const ProfileSocialIcons: React.FC<ProfileSocialIconsProps> = ({
   interactive = true,
   onClick,
 }) => {
-  if (!profile.showSocialInHeader || !profile.socialAccounts?.length) return null;
+  const socialAccounts = profile.socialAccounts || [];
+  const { counts } = useSocialFollowerCounts(socialAccounts);
+
+  if (!profile.showSocialInHeader || socialAccounts.length === 0) return null;
 
   const style = { ...getDefaultSocialIconStyle(isDark), ...profile.socialIconStyle };
 
@@ -57,14 +62,15 @@ const ProfileSocialIcons: React.FC<ProfileSocialIconsProps> = ({
       className={`flex flex-wrap gap-3 mt-4 ${centered ? 'justify-center' : ''} ${onClick ? 'cursor-pointer' : ''} ${className}`}
       onClick={onClick}
     >
-      {profile.socialAccounts.map((account) => {
+      {socialAccounts.map((account) => {
         const option = getSocialPlatformOption(account.platform);
         if (!option) return null;
 
         const BrandIcon = option.brandIcon;
         const FallbackIcon = option.icon;
         const url = buildSocialUrl(account.platform, account.handle);
-        const showCount = profile.showFollowerCount && account.followerCount;
+        const followerCount = getDisplayFollowerCount(account, counts[account.platform]);
+        const showCount = profile.showFollowerCount && typeof followerCount === 'number';
         const iconColor =
           style.useBrandColor !== false ? option.brandColor || style.iconColor : style.iconColor;
         const countColor = style.useBrandColor === false ? style.iconColor : undefined;
@@ -111,7 +117,7 @@ const ProfileSocialIcons: React.FC<ProfileSocialIconsProps> = ({
                 className={`text-sm font-semibold ${countColor ? '' : isDark ? 'text-gray-200' : 'text-gray-700'}`}
                 style={countColor ? { color: countColor } : undefined}
               >
-                {formatFollowerCount(account.followerCount)}
+                {formatFollowerCount(followerCount!)}
               </span>
             )}
           </a>
