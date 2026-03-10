@@ -633,7 +633,11 @@ const Block: React.FC<BlockProps> = ({
   const isYoutubeGrid = isYoutube && block.youtubeMode === 'grid';
   const isYoutubeList = isYoutube && block.youtubeMode === 'list';
 
-  const isLinkWithImage = block.type === BlockType.LINK && block.imageUrl;
+  const hasImageBackground =
+    !!block.imageUrl &&
+    (block.type === BlockType.LINK ||
+      block.type === BlockType.TEXT ||
+      (block.type === BlockType.SOCIAL && !isYoutube));
 
   const backgroundStyle: React.CSSProperties = block.customBackground
     ? { background: block.customBackground }
@@ -647,7 +651,7 @@ const Block: React.FC<BlockProps> = ({
       backgroundSize: 'cover',
       backgroundPosition: 'center',
     };
-  } else if (isLinkWithImage && block.imageUrl) {
+  } else if (hasImageBackground && block.imageUrl) {
     const pos = mediaPosition;
     finalStyle = {
       backgroundImage: `url(${block.imageUrl})`,
@@ -864,7 +868,7 @@ const Block: React.FC<BlockProps> = ({
         onMouseLeave={enableTiltEffect ? onTiltLeave : undefined}
         onMouseEnter={enableTiltEffect ? onTiltEnter : undefined}
         style={{ ...finalStyle, borderRadius, ...tiltWrapperStyle }}
-        className={`bento-item group relative overflow-hidden w-full h-full ${!block.customBackground && !isLinkWithImage && !isRichYoutube ? block.color || 'bg-white' : ''} ${block.textColor || 'text-gray-900'}
+        className={`bento-item group relative overflow-hidden w-full h-full ${!block.customBackground && !hasImageBackground && !isRichYoutube ? block.color || 'bg-white' : ''} ${block.textColor || 'text-gray-900'}
           ${isSelected ? 'ring-4 ring-blue-500 shadow-xl' : 'ring-1 ring-black/5'}
           ${!isSelected && !enableTiltEffect ? 'shadow-sm hover:shadow-xl' : 'shadow-sm'}
           ${isDragTarget ? 'ring-2 ring-violet-500' : ''}
@@ -922,14 +926,14 @@ const Block: React.FC<BlockProps> = ({
         {resizeHandle}
 
         {/* Gradient overlay for image backgrounds - only when there's text */}
-        {(isRichYoutube || isLinkWithImage) &&
-          (block.title || block.subtext || block.channelTitle) &&
+        {(isRichYoutube || hasImageBackground) &&
+          (block.title || block.subtext || block.content || block.channelTitle) &&
           !isRepositioning && (
             <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-0 pointer-events-none" />
           )}
 
-        {/* Reposition UI for LINK blocks with images */}
-        {isLinkWithImage && (
+        {/* Reposition UI for blocks with image backgrounds */}
+        {hasImageBackground && (
           <>
             {/* Reposition button - appears on hover */}
             {!isRepositioning && onInlineUpdate && (
@@ -995,7 +999,7 @@ const Block: React.FC<BlockProps> = ({
 
         <div className="w-full h-full pointer-events-none relative z-10">
           {/* MEDIA BLOCK (Image/Video/GIF) */}
-          {block.type === BlockType.MEDIA && block.imageUrl && !isLinkWithImage ? (
+          {block.type === BlockType.MEDIA && block.imageUrl && !hasImageBackground ? (
             <div
               ref={mediaContainerRef}
               className={`w-full h-full relative overflow-hidden ${isRepositioning ? 'cursor-move' : ''}`}
@@ -1160,7 +1164,7 @@ const Block: React.FC<BlockProps> = ({
                   return (
                     <div
                       className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                        block.textColor === 'text-white' || isLinkWithImage
+                        block.textColor === 'text-white' || hasImageBackground
                           ? 'bg-white/20 text-white backdrop-blur-sm'
                           : 'bg-gray-100'
                       }`}
@@ -1199,12 +1203,12 @@ const Block: React.FC<BlockProps> = ({
                       onBlur={handleTitleSave}
                       onKeyDown={handleTitleKeyDown}
                       onClick={(e) => e.stopPropagation()}
-                      className={`font-bold leading-tight tracking-tight bg-transparent border-b-2 border-violet-500 outline-none w-full pointer-events-auto ${block.type === BlockType.TEXT ? `${textSizes.titleText} mb-2` : textSizes.titleDefault} ${isLinkWithImage ? 'text-white' : ''}`}
+                      className={`font-bold leading-tight tracking-tight bg-transparent border-b-2 border-violet-500 outline-none w-full pointer-events-auto ${block.type === BlockType.TEXT ? `${textSizes.titleText} mb-2` : textSizes.titleDefault} ${hasImageBackground ? 'text-white' : ''}`}
                       placeholder="Title..."
                     />
                   ) : (
                     <h3
-                      className={`font-bold leading-tight tracking-tight cursor-text ${block.type === BlockType.TEXT ? `${textSizes.titleText} mb-2` : textSizes.titleDefault} ${isLinkWithImage ? 'text-white drop-shadow-lg' : ''}`}
+                      className={`font-bold leading-tight tracking-tight cursor-text ${block.type === BlockType.TEXT ? `${textSizes.titleText} mb-2` : textSizes.titleDefault} ${hasImageBackground ? 'text-white drop-shadow-lg' : ''}`}
                       onClick={(e) => {
                         if (onInlineUpdate) {
                           e.stopPropagation();
@@ -1237,13 +1241,13 @@ const Block: React.FC<BlockProps> = ({
                       onBlur={handleSubtextSave}
                       onKeyDown={handleSubtextKeyDown}
                       onClick={(e) => e.stopPropagation()}
-                      className={`${textSizes.subtext} font-medium bg-transparent border-b-2 border-violet-500 outline-none w-full pointer-events-auto mt-1 ${isLinkWithImage ? 'text-white/70' : 'opacity-60'}`}
+                      className={`${textSizes.subtext} font-medium bg-transparent border-b-2 border-violet-500 outline-none w-full pointer-events-auto mt-1 ${hasImageBackground ? 'text-white/70' : 'opacity-60'}`}
                       placeholder="Subtitle..."
                     />
                   ) : (
                     (block.subtext || onInlineUpdate) && (
                       <p
-                        className={`${textSizes.subtext} mt-1 font-medium cursor-text ${isLinkWithImage ? 'text-white/80 drop-shadow' : 'opacity-60'}`}
+                        className={`${textSizes.subtext} mt-1 font-medium cursor-text ${hasImageBackground ? 'text-white/80 drop-shadow' : 'opacity-60'}`}
                         onClick={(e) => {
                           if (onInlineUpdate) {
                             e.stopPropagation();
@@ -1267,7 +1271,7 @@ const Block: React.FC<BlockProps> = ({
 
                 {block.type === BlockType.TEXT && block.content && (
                   <p
-                    className={`opacity-70 mt-2 whitespace-pre-wrap leading-relaxed ${textSizes.body}`}
+                    className={`mt-2 whitespace-pre-wrap leading-relaxed ${textSizes.body} ${hasImageBackground ? 'text-white/85 drop-shadow-sm' : 'opacity-70'}`}
                   >
                     {block.content}
                   </p>

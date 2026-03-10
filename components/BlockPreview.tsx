@@ -236,7 +236,11 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
   const isRichYoutube =
     isYoutube && activeVideoId && block.youtubeMode !== 'grid' && block.youtubeMode !== 'list';
   const isYoutubeGrid = isYoutube && (block.youtubeMode === 'grid' || block.youtubeMode === 'list');
-  const isLinkWithImage = block.type === BlockType.LINK && block.imageUrl;
+  const hasImageBackground =
+    !!block.imageUrl &&
+    (block.type === BlockType.LINK ||
+      block.type === BlockType.TEXT ||
+      (block.type === BlockType.SOCIAL && !isYoutube));
 
   // Background style
   let finalStyle: React.CSSProperties = block.customBackground
@@ -248,7 +252,7 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
       backgroundSize: 'cover',
       backgroundPosition: 'center',
     };
-  } else if (isLinkWithImage && block.imageUrl) {
+  } else if (hasImageBackground && block.imageUrl) {
     finalStyle = {
       backgroundImage: `url(${block.imageUrl})`,
       backgroundSize: 'cover',
@@ -390,7 +394,7 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
         onMouseLeave={enableTiltEffect ? onTiltLeave : undefined}
         onMouseEnter={enableTiltEffect ? onTiltEnter : undefined}
         style={{ ...finalStyle, borderRadius, ...tiltWrapperStyle }}
-        className={`bento-item group relative overflow-hidden w-full h-full ${!block.customBackground && !isLinkWithImage && !isRichYoutube ? block.color || 'bg-white' : ''} ${block.textColor || 'text-gray-900'} ring-1 ring-black/5 shadow-sm ${!enableTiltEffect ? 'hover:shadow-xl' : ''} transition-all duration-300`}
+        className={`bento-item group relative overflow-hidden w-full h-full ${!block.customBackground && !hasImageBackground && !isRichYoutube ? block.color || 'bg-white' : ''} ${block.textColor || 'text-gray-900'} ring-1 ring-black/5 shadow-sm ${!enableTiltEffect ? 'hover:shadow-xl' : ''} transition-all duration-300`}
       >
         {/* Glare effect */}
         {enableTiltEffect && (
@@ -403,14 +407,14 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
         )}
 
         {/* Gradient overlay for images */}
-        {(isRichYoutube || isLinkWithImage) &&
-          (block.title || block.subtext || block.channelTitle) && (
+        {(isRichYoutube || hasImageBackground) &&
+          (block.title || block.subtext || block.content || block.channelTitle) && (
             <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-0 pointer-events-none" />
           )}
 
         <div className="w-full h-full pointer-events-none relative z-10">
           {/* MEDIA BLOCK */}
-          {block.type === BlockType.MEDIA && block.imageUrl && !isLinkWithImage ? (
+          {block.type === BlockType.MEDIA && block.imageUrl && !hasImageBackground ? (
             <div className="w-full h-full relative overflow-hidden">
               {/\.(mp4|webm|ogg|mov)$/i.test(block.imageUrl) ? (
                 <video
@@ -502,7 +506,7 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
                   const iconColor = useColor ? brandColor : undefined;
                   return (
                     <div
-                      className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center shrink-0 ${block.textColor === 'text-white' || isLinkWithImage ? 'bg-white/20 text-white backdrop-blur-sm' : 'bg-gray-100'}`}
+                      className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center shrink-0 ${block.textColor === 'text-white' || hasImageBackground ? 'bg-white/20 text-white backdrop-blur-sm' : 'bg-gray-100'}`}
                       style={iconColor ? { color: iconColor } : undefined}
                     >
                       {BrandIcon ? (
@@ -517,20 +521,20 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
                 className={`${block.type === BlockType.TEXT ? 'flex flex-col justify-center h-full' : 'mt-auto'}`}
               >
                 <h3
-                  className={`font-bold leading-tight tracking-tight ${block.type === BlockType.TEXT ? `${textSizes.titleText} mb-2` : textSizes.titleDefault} ${isLinkWithImage ? 'text-white drop-shadow-lg' : ''}`}
+                  className={`font-bold leading-tight tracking-tight ${block.type === BlockType.TEXT ? `${textSizes.titleText} mb-2` : textSizes.titleDefault} ${hasImageBackground ? 'text-white drop-shadow-lg' : ''}`}
                 >
                   {block.channelTitle || block.title}
                 </h3>
                 {block.subtext && (
                   <p
-                    className={`${textSizes.subtext} mt-1 font-medium ${isLinkWithImage ? 'text-white/80 drop-shadow' : 'opacity-60'}`}
+                    className={`${textSizes.subtext} mt-1 font-medium ${hasImageBackground ? 'text-white/80 drop-shadow' : 'opacity-60'}`}
                   >
                     {block.subtext}
                   </p>
                 )}
                 {block.type === BlockType.TEXT && block.content && (
                   <p
-                    className={`opacity-70 mt-2 whitespace-pre-wrap leading-relaxed ${textSizes.body}`}
+                    className={`mt-2 whitespace-pre-wrap leading-relaxed ${textSizes.body} ${hasImageBackground ? 'text-white/85 drop-shadow-sm' : 'opacity-70'}`}
                   >
                     {block.content}
                   </p>
