@@ -240,6 +240,7 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
   const isYoutubeGrid = isYoutube && (block.youtubeMode === 'grid' || block.youtubeMode === 'list');
   const resolvedImageUrl = resolveImageSrc(block.imageUrl);
   const isLinkWithImage = block.type === BlockType.LINK && !!resolvedImageUrl;
+  const blockOpacity = Math.min(1, Math.max(0, block.opacity ?? 1));
 
   // Background style
   let finalStyle: React.CSSProperties = block.customBackground
@@ -294,14 +295,23 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
             openSafeUrl(url);
           }
         }}
-        className={`bento-item relative overflow-hidden h-full ${block.color || 'bg-white'} transition-all duration-200 group flex items-center justify-center shadow-sm border border-gray-100 hover:shadow-md`}
+        className="bento-item relative overflow-hidden h-full transition-all duration-200 group flex items-center justify-center shadow-sm border border-gray-100 hover:shadow-md"
         style={{
           ...gridPositionStyle,
           borderRadius,
-          ...(block.customBackground ? { background: block.customBackground } : {}),
         }}
       >
-        <span className="group-hover:scale-110 transition-transform" style={{ color: iconColor }}>
+        <div
+          className={`absolute inset-0 ${block.customBackground ? '' : block.color || 'bg-white'}`}
+          style={{
+            opacity: blockOpacity,
+            ...(block.customBackground ? { background: block.customBackground } : {}),
+          }}
+        />
+        <span
+          className="group-hover:scale-110 transition-transform relative z-10"
+          style={{ color: iconColor }}
+        >
           {BrandIcon ? <BrandIcon size={24} /> : FallbackIcon ? <FallbackIcon size={24} /> : null}
         </span>
       </a>
@@ -314,13 +324,19 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
     return (
       <div
         onClick={handleClick}
-        className={`bento-item group relative overflow-hidden ${block.color || 'bg-white'} cursor-pointer h-full ring-1 ring-black/5 shadow-sm hover:shadow-xl transition-all duration-300`}
+        className="bento-item group relative overflow-hidden cursor-pointer h-full ring-1 ring-black/5 shadow-sm hover:shadow-xl transition-all duration-300"
         style={{
           ...gridPositionStyle,
           borderRadius,
-          ...(block.customBackground ? { background: block.customBackground } : {}),
         }}
       >
+        <div
+          className={`absolute inset-0 ${block.customBackground ? '' : block.color || 'bg-white'}`}
+          style={{
+            opacity: blockOpacity,
+            ...(block.customBackground ? { background: block.customBackground } : {}),
+          }}
+        />
         <div className="w-full h-full flex flex-col p-2 md:p-3">
           <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
             <div className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-red-600 text-white flex items-center justify-center shrink-0">
@@ -392,9 +408,15 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
         onMouseMove={enableTiltEffect ? onTiltMove : undefined}
         onMouseLeave={enableTiltEffect ? onTiltLeave : undefined}
         onMouseEnter={enableTiltEffect ? onTiltEnter : undefined}
-        style={{ ...finalStyle, borderRadius, ...tiltWrapperStyle }}
-        className={`bento-item group relative overflow-hidden w-full h-full ${!block.customBackground && !isLinkWithImage && !isRichYoutube ? block.color || 'bg-white' : ''} ${block.textColor || 'text-gray-900'} ring-1 ring-black/5 shadow-sm ${!enableTiltEffect ? 'hover:shadow-xl' : ''} transition-all duration-300`}
+        style={{ borderRadius, ...tiltWrapperStyle }}
+        className={`bento-item group relative overflow-hidden w-full h-full ${block.textColor || 'text-gray-900'} ring-1 ring-black/5 shadow-sm ${!enableTiltEffect ? 'hover:shadow-xl' : ''} transition-all duration-300`}
       >
+        {(isRichYoutube || isLinkWithImage || block.customBackground || block.color) && (
+          <div
+            className={`absolute inset-0 ${!block.customBackground && !isLinkWithImage && !isRichYoutube ? block.color || 'bg-white' : ''}`}
+            style={{ ...finalStyle, borderRadius, opacity: blockOpacity }}
+          />
+        )}
         {/* Glare effect */}
         {enableTiltEffect && (
           <div
@@ -408,7 +430,10 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
         {/* Gradient overlay for images */}
         {(isRichYoutube || isLinkWithImage) &&
           (block.title || block.subtext || block.channelTitle) && (
-            <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-0 pointer-events-none" />
+            <div
+              className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-0 pointer-events-none"
+              style={{ opacity: blockOpacity }}
+            />
           )}
 
         <div className="w-full h-full pointer-events-none relative z-10">
@@ -419,7 +444,10 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
                 <video
                   src={resolvedImageUrl}
                   className="full-img"
-                  style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
+                  style={{
+                    objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
+                    opacity: blockOpacity,
+                  }}
                   autoPlay
                   loop
                   muted
@@ -430,7 +458,10 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
                   src={resolvedImageUrl}
                   alt={block.title || ''}
                   className="full-img"
-                  style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
+                  style={{
+                    objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
+                    opacity: blockOpacity,
+                  }}
                   draggable={false}
                 />
               )}
@@ -447,14 +478,16 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
             /* MAP BLOCK */
             <div className="w-full h-full relative bg-gray-100 overflow-hidden">
               {isValidLocationString(block.content) ? (
-                <iframe
-                  width="100%"
-                  height="100%"
-                  className="opacity-95 grayscale-[20%] group-hover:grayscale-0 transition-all duration-500"
-                  src={`https://maps.google.com/maps?q=${encodeURIComponent(block.content || 'Paris')}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
-                  loading="lazy"
-                  sandbox="allow-scripts allow-same-origin"
-                ></iframe>
+                <div style={{ opacity: blockOpacity }} className="w-full h-full">
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    className="opacity-95 grayscale-[20%] group-hover:grayscale-0 transition-all duration-500"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(block.content || 'Paris')}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
+                    loading="lazy"
+                    sandbox="allow-scripts allow-same-origin"
+                  ></iframe>
+                </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
                   Invalid location

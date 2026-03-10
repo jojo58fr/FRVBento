@@ -339,6 +339,10 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
     return editingBlock.color === c.bg;
   };
 
+  const blockOpacityPercent = editingBlock
+    ? Math.round(Math.min(1, Math.max(0, editingBlock.opacity ?? 1)) * 100)
+    : 100;
+
   return (
     <aside
       role="complementary"
@@ -1066,6 +1070,31 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
                   <Palette size={14} /> Background
                 </label>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      Opacity
+                    </label>
+                    <span className="text-xs font-semibold text-gray-500">
+                      {blockOpacityPercent}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={blockOpacityPercent}
+                    onChange={(e) =>
+                      updateBlock({
+                        ...editingBlock,
+                        opacity: Number(e.target.value) / 100,
+                      })
+                    }
+                    className="w-full accent-gray-900"
+                  />
+                </div>
 
                 {/* Solid Colors */}
                 <div className="space-y-2">

@@ -65,6 +65,7 @@ const Block = ({ block }: { block: BlockData }) => {
   const isRichYT = isYoutube && activeVideoId && block.youtubeMode !== 'grid' && block.youtubeMode !== 'list'
   const isYTGrid = isYoutube && (block.youtubeMode === 'grid' || block.youtubeMode === 'list')
   const isLinkImg = block.type === BlockType.LINK && block.imageUrl
+  const blockOpacity = Math.min(1, Math.max(0, block.opacity ?? 1))
 
   if (block.type === BlockType.SPACER) return <div style={{ borderRadius, ...gridStyle }} className="h-full" />
 
@@ -74,17 +75,21 @@ const Block = ({ block }: { block: BlockData }) => {
     const url = block.socialHandle ? platform?.buildUrl(block.socialHandle) : ''
     return (
       <a href={url || undefined} target="_blank" rel="noopener noreferrer" onClick={handleClick}
-        className={\`bento-item relative h-full \${block.color || 'bg-white'} flex items-center justify-center shadow-sm border border-gray-100 hover:shadow-md transition-all\`}
-        style={{ borderRadius, ...gridStyle, ...(block.customBackground ? { background: block.customBackground } : {}) }}>
-        {Icon && <span style={{ color: platform.brandColor }}><Icon size={24} /></span>}
+        className="bento-item relative h-full flex items-center justify-center shadow-sm border border-gray-100 hover:shadow-md transition-all"
+        style={{ borderRadius, ...gridStyle }}>
+        <div className={\`absolute inset-0 \${block.customBackground ? '' : block.color || 'bg-white'}\`}
+          style={{ opacity: blockOpacity, ...(block.customBackground ? { background: block.customBackground } : {}) }} />
+        {Icon && <span className="relative z-10" style={{ color: platform.brandColor }}><Icon size={24} /></span>}
       </a>
     )
   }
 
   if (isYTGrid) {
     return (
-      <div onClick={handleClick} style={{ borderRadius, ...gridStyle, ...(block.customBackground ? { background: block.customBackground } : {}) }}
-        className={\`bento-item group cursor-pointer h-full \${block.color || 'bg-white'} ring-1 ring-black/5 shadow-sm hover:shadow-xl transition-all\`}>
+      <div onClick={handleClick} style={{ borderRadius, ...gridStyle }}
+        className="bento-item group relative cursor-pointer h-full ring-1 ring-black/5 shadow-sm hover:shadow-xl transition-all">
+        <div className={\`absolute inset-0 \${block.customBackground ? '' : block.color || 'bg-white'}\`}
+          style={{ opacity: blockOpacity, ...(block.customBackground ? { background: block.customBackground } : {}) }} />
         <div className="w-full h-full flex flex-col p-2 md:p-3">
           <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
             <div className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center"><Youtube size={12} /></div>
@@ -119,27 +124,34 @@ const Block = ({ block }: { block: BlockData }) => {
   return (
     <div onClick={handleClick} style={{ ...gridStyle }} className="cursor-pointer h-full transform-gpu">
       <div ref={elementRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
-        style={{ ...bgStyle, borderRadius, ...tiltStyle, width: '100%', height: '100%', transformStyle: 'preserve-3d' }}
-        className={\`bento-item group relative overflow-hidden w-full h-full \${!block.customBackground && !isLinkImg && !isRichYT ? (block.color || 'bg-white') : ''} \${block.textColor || 'text-gray-900'} ring-1 ring-black/5 shadow-sm transition-all\`}>
+        style={{ borderRadius, ...tiltStyle, width: '100%', height: '100%', transformStyle: 'preserve-3d' }}
+        className={\`bento-item group relative overflow-hidden w-full h-full \${block.textColor || 'text-gray-900'} ring-1 ring-black/5 shadow-sm transition-all\`}>
+        {(isRichYT || isLinkImg || block.customBackground || block.color) && (
+          <div className={\`absolute inset-0 \${!block.customBackground && !isLinkImg && !isRichYT ? (block.color || 'bg-white') : ''}\`}
+            style={{ ...bgStyle, borderRadius, opacity: blockOpacity }} />
+        )}
         <div className="absolute inset-0 pointer-events-none z-30 opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ background: 'radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255,255,255,0.25) 0%, transparent 60%)' }} />
         {(isRichYT || isLinkImg) && (block.title || block.subtext) && (
-          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-0" />
+          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-0"
+            style={{ opacity: blockOpacity }} />
         )}
         <div className="w-full h-full relative z-10">
           {block.type === BlockType.MEDIA && block.imageUrl ? (
             <div className="w-full h-full relative overflow-hidden">
               {/\\.(mp4|webm|ogg|mov)$/i.test(block.imageUrl) ? (
-                <video src={block.imageUrl} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\` }} autoPlay loop muted playsInline />
+                <video src={block.imageUrl} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\`, opacity: blockOpacity }} autoPlay loop muted playsInline />
               ) : (
-                <img src={block.imageUrl} alt={block.title || ''} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\` }} />
+                <img src={block.imageUrl} alt={block.title || ''} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\`, opacity: blockOpacity }} />
               )}
               {block.title && <div className="media-overlay"><p className="media-title text-sm">{block.title}</p>{block.subtext && <p className="media-subtext">{block.subtext}</p>}</div>}
             </div>
           ) : block.type === BlockType.MAP ? (
             <div className="w-full h-full relative bg-gray-100 overflow-hidden">
-              <iframe width="100%" height="100%" className="opacity-95 grayscale-[20%] group-hover:grayscale-0 transition-all"
-                src={\`https://maps.google.com/maps?q=\${encodeURIComponent(block.content || 'Paris')}&t=&z=13&ie=UTF8&iwloc=&output=embed\`} loading="lazy" sandbox="allow-scripts allow-same-origin" />
+              <div style={{ opacity: blockOpacity }} className="w-full h-full">
+                <iframe width="100%" height="100%" className="opacity-95 grayscale-[20%] group-hover:grayscale-0 transition-all"
+                  src={\`https://maps.google.com/maps?q=\${encodeURIComponent(block.content || 'Paris')}&t=&z=13&ie=UTF8&iwloc=&output=embed\`} loading="lazy" sandbox="allow-scripts allow-same-origin" />
+              </div>
               {block.title && <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent"><p className="font-semibold text-white text-sm">{block.title}</p></div>}
             </div>
           ) : block.type === BlockType.FLUID_TEXT ? (

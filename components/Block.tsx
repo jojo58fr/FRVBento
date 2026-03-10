@@ -555,7 +555,6 @@ const Block: React.FC<BlockProps> = ({
         data-block-id={block.id}
         className={`
           bento-item relative cursor-pointer overflow-hidden h-full
-          ${block.color || 'bg-white'}
           ${isSelected ? 'ring-2 ring-violet-500 shadow-lg' : 'hover:ring-2 hover:ring-gray-300 hover:shadow-md'}
           ${isDragTarget ? 'ring-2 ring-violet-500 bg-violet-50/50 scale-105' : ''}
           ${isDragging ? 'opacity-40 scale-95' : ''}
@@ -567,20 +566,26 @@ const Block: React.FC<BlockProps> = ({
         style={{
           ...gridPositionStyle,
           borderRadius,
-          ...(block.customBackground ? { background: block.customBackground } : {}),
         }}
       >
+        <div
+          className={`absolute inset-0 ${block.customBackground ? '' : block.color || 'bg-white'}`}
+          style={{
+            opacity: blockOpacity,
+            ...(block.customBackground ? { background: block.customBackground } : {}),
+          }}
+        />
         {BrandIcon ? (
           <span
             style={{ color: iconColor }}
-            className="group-hover:scale-110 transition-transform inline-flex"
+            className="group-hover:scale-110 transition-transform inline-flex relative z-10"
           >
             <BrandIcon size={24} />
           </span>
         ) : FallbackIcon ? (
           <span
             style={{ color: iconColor || '#374151' }}
-            className="group-hover:scale-110 transition-transform inline-flex"
+            className="group-hover:scale-110 transition-transform inline-flex relative z-10"
           >
             <FallbackIcon size={24} />
           </span>
@@ -636,9 +641,9 @@ const Block: React.FC<BlockProps> = ({
     isYoutube && activeVideoId && block.youtubeMode !== 'grid' && block.youtubeMode !== 'list';
   const isYoutubeGrid = isYoutube && block.youtubeMode === 'grid';
   const isYoutubeList = isYoutube && block.youtubeMode === 'list';
-
-    const resolvedImageUrl = resolveImageSrc(block.imageUrl);
-    const isLinkWithImage = block.type === BlockType.LINK && !!resolvedImageUrl;
+  const resolvedImageUrl = resolveImageSrc(block.imageUrl);
+  const isLinkWithImage = block.type === BlockType.LINK && !!resolvedImageUrl;
+  const blockOpacity = Math.min(1, Math.max(0, block.opacity ?? 1));
 
   const backgroundStyle: React.CSSProperties = block.customBackground
     ? { background: block.customBackground }
@@ -717,9 +722,8 @@ const Block: React.FC<BlockProps> = ({
         style={{
           ...gridPositionStyle,
           borderRadius,
-          ...(block.customBackground ? { background: block.customBackground } : {}),
         }}
-        className={`bento-item group relative overflow-hidden ${block.color || 'bg-white'} ${colClass} ${rowClass} cursor-pointer h-full
+        className={`bento-item group relative overflow-hidden ${colClass} ${rowClass} cursor-pointer h-full
           ${isSelected ? 'ring-4 ring-blue-500 shadow-xl z-20' : 'ring-1 ring-black/5'}
           ${!isSelected ? 'shadow-sm hover:shadow-xl' : ''}
           ${isDragTarget ? 'ring-2 ring-violet-500 z-20 scale-[1.02]' : ''}
@@ -728,6 +732,13 @@ const Block: React.FC<BlockProps> = ({
           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
         `}
       >
+        <div
+          className={`absolute inset-0 ${block.customBackground ? '' : block.color || 'bg-white'}`}
+          style={{
+            opacity: blockOpacity,
+            ...(block.customBackground ? { background: block.customBackground } : {}),
+          }}
+        />
         {/* Drop indicator */}
         {isDragTarget && (
           <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-1.5 h-16 bg-violet-500 rounded-full shadow-md shadow-violet-500/30 animate-pulse z-30" />
@@ -868,8 +879,8 @@ const Block: React.FC<BlockProps> = ({
         onMouseMove={enableTiltEffect ? onTiltMove : undefined}
         onMouseLeave={enableTiltEffect ? onTiltLeave : undefined}
         onMouseEnter={enableTiltEffect ? onTiltEnter : undefined}
-        style={{ ...finalStyle, borderRadius, ...tiltWrapperStyle }}
-        className={`bento-item group relative overflow-hidden w-full h-full ${!block.customBackground && !isLinkWithImage && !isRichYoutube ? block.color || 'bg-white' : ''} ${block.textColor || 'text-gray-900'}
+        style={{ borderRadius, ...tiltWrapperStyle }}
+        className={`bento-item group relative overflow-hidden w-full h-full ${block.textColor || 'text-gray-900'}
           ${isSelected ? 'ring-4 ring-blue-500 shadow-xl' : 'ring-1 ring-black/5'}
           ${!isSelected && !enableTiltEffect ? 'shadow-sm hover:shadow-xl' : 'shadow-sm'}
           ${isDragTarget ? 'ring-2 ring-violet-500' : ''}
@@ -877,6 +888,16 @@ const Block: React.FC<BlockProps> = ({
           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
         `}
       >
+        {(isRichYoutube || isLinkWithImage || block.customBackground || block.color) && (
+          <div
+            className={`absolute inset-0 ${!block.customBackground && !isLinkWithImage && !isRichYoutube ? block.color || 'bg-white' : ''}`}
+            style={{
+              ...finalStyle,
+              borderRadius,
+              opacity: blockOpacity,
+            }}
+          />
+        )}
         {/* Drop indicator */}
         {isDragTarget && (
           <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-1.5 h-16 bg-violet-500 rounded-full shadow-md shadow-violet-500/30 animate-pulse z-30" />
@@ -930,7 +951,10 @@ const Block: React.FC<BlockProps> = ({
         {(isRichYoutube || isLinkWithImage) &&
           (block.title || block.subtext || block.channelTitle) &&
           !isRepositioning && (
-            <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-0 pointer-events-none" />
+            <div
+              className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-0 pointer-events-none"
+              style={{ opacity: blockOpacity }}
+            />
           )}
 
         {/* Reposition UI for LINK blocks with images */}
@@ -1012,7 +1036,10 @@ const Block: React.FC<BlockProps> = ({
                 <video
                     src={resolvedImageUrl}
                   className="full-img"
-                  style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
+                  style={{
+                    objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
+                    opacity: blockOpacity,
+                  }}
                   autoPlay
                   loop
                   muted
@@ -1023,7 +1050,10 @@ const Block: React.FC<BlockProps> = ({
                     src={resolvedImageUrl}
                   alt={block.title || ''}
                   className="full-img"
-                  style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
+                  style={{
+                    objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
+                    opacity: blockOpacity,
+                  }}
                   draggable={false}
                 />
               )}
@@ -1101,14 +1131,16 @@ const Block: React.FC<BlockProps> = ({
             <div className="w-full h-full relative bg-gray-100 overflow-hidden">
               {/* SECURITY: Only render iframe if location is valid (not a URL/script) */}
               {isValidLocationString(block.content) ? (
-                <iframe
-                  width="100%"
-                  height="100%"
-                  className="opacity-95 grayscale-[20%] group-hover:grayscale-0 transition-all duration-500"
-                  src={`https://maps.google.com/maps?q=${encodeURIComponent(block.content || 'Paris')}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
-                  loading="lazy"
-                  sandbox="allow-scripts allow-same-origin"
-                ></iframe>
+                <div style={{ opacity: blockOpacity }} className="w-full h-full">
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    className="opacity-95 grayscale-[20%] group-hover:grayscale-0 transition-all duration-500"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(block.content || 'Paris')}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
+                    loading="lazy"
+                    sandbox="allow-scripts allow-same-origin"
+                  ></iframe>
+                </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
                   Invalid location

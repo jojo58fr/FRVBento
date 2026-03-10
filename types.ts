@@ -53,6 +53,7 @@ export interface BlockData {
   title?: string;
   content?: string; // URL or Text
   subtext?: string;
+  opacity?: number; // 0-1
   imageUrl?: string | ImageData;
   mediaPosition?: { x: number; y: number }; // Object position for media (0-100 for each axis)
   colSpan: number; // 1-9 (9-col grid)

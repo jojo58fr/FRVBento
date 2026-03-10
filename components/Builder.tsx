@@ -1326,6 +1326,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                     ? 'Fluid Text'
                   : 'New Block',
       content: '',
+      opacity: 1,
       colSpan,
       rowSpan,
       color:
