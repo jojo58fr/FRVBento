@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   Droplets,
   FolderTree,
+  Search,
 } from 'lucide-react';
 import {
   buildSocialUrl,
@@ -61,6 +62,7 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
   const [imageNotice, setImageNotice] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const blockImageInputRef = useRef<HTMLInputElement | null>(null);
+  const [platformSearch, setPlatformSearch] = useState('');
 
   useEffect(() => {
     if (!imageNotice && !imageError) return;
@@ -150,6 +152,9 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
     return luminance > 0.6 ? 'text-gray-900' : 'text-white';
   };
+  const filteredSocialPlatforms = SOCIAL_PLATFORM_OPTIONS.filter((platform) =>
+    platform.label.toLowerCase().includes(platformSearch.trim().toLowerCase())
+  );
 
   const fetchLatestFromRSS = async () => {
     const cId = editingBlock?.channelId;
@@ -616,11 +621,37 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     <div className="space-y-4">
                       <div>
                         <fieldset>
-                          <legend className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                            Platform
-                          </legend>
+                          <div className="flex items-center gap-2 mb-2">
+                            <legend className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
+                              Platform
+                            </legend>
+                            <div className="relative w-32 ml-auto focus-within:w-40 transition-all duration-200 ease-out">
+                              <Search
+                                size={14}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                              />
+                              <input
+                                type="text"
+                                value={platformSearch}
+                                onChange={(e) => setPlatformSearch(e.target.value)}
+                                placeholder="Search"
+                                aria-label="Search platform"
+                                className="w-full bg-gray-50 border border-gray-200 rounded-xl py-1.5 pl-9 pr-9 text-xs font-medium text-gray-600 focus:ring-2 focus:ring-black/5 focus:border-black focus:outline-none transition-all"
+                              />
+                              {platformSearch && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPlatformSearch('')}
+                                  aria-label="Clear platform search"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
+                                >
+                                  <X size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
                           <div className="grid grid-cols-3 gap-2">
-                            {SOCIAL_PLATFORM_OPTIONS.map((platform) => {
+                            {filteredSocialPlatforms.map((platform) => {
                               const active = platform.id === resolvedSocialPlatform;
                               return (
                                 <button
@@ -643,6 +674,11 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                               );
                             })}
                           </div>
+                          {filteredSocialPlatforms.length === 0 && (
+                            <p className="mt-3 text-xs text-gray-400 text-center py-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                              No platform found
+                            </p>
+                          )}
                         </fieldset>
                       </div>
 
