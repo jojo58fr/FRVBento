@@ -899,18 +899,25 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
               )}
               {(editingBlock.type === BlockType.LINK ||
                 editingBlock.type === BlockType.MEDIA ||
-                editingBlock.type === BlockType.MAP) && (
+                editingBlock.type === BlockType.MAP ||
+                editingBlock.type === BlockType.TEXT ||
+                editingBlock.type === BlockType.SOCIAL) && (
                 <div>
                   {/* Image Upload for Block */}
                   {(editingBlock.type === BlockType.MEDIA ||
-                    editingBlock.type === BlockType.LINK) && (
+                    editingBlock.type === BlockType.LINK ||
+                    editingBlock.type === BlockType.TEXT ||
+                    editingBlock.type === BlockType.SOCIAL) && (
                     <div className="mb-4">
                       <label
                         htmlFor="block-img-upload"
                         className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2"
                       >
-                        Upload Image{' '}
-                        {editingBlock.type === BlockType.LINK ? '(Optional Background)' : ''}
+                        Upload Image
+                        {(editingBlock.type === BlockType.LINK ||
+                          editingBlock.type === BlockType.TEXT ||
+                          editingBlock.type === BlockType.SOCIAL) &&
+                          ' (Optional Background)'}
                       </label>
                       <label
                         htmlFor="block-img-upload"
@@ -979,36 +986,42 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     </div>
                   )}
 
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                    {editingBlock.type === BlockType.MEDIA
-                      ? 'Media URL / Path'
-                      : editingBlock.type === BlockType.MAP
-                        ? 'Address / City'
-                        : 'Destination URL'}
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 focus:ring-2 focus:ring-black/5 focus:border-black focus:outline-none transition-all font-mono text-xs text-gray-600"
-                      value={
-                        editingBlock.type === BlockType.MEDIA
-                          ? editingBlockImageInput || ''
-                          : editingBlock.content || ''
-                      }
-                    onChange={(e) => {
-                      if (editingBlock.type === BlockType.MEDIA)
-                        updateBlock({ ...editingBlock, imageUrl: e.target.value });
-                      else updateBlock({ ...editingBlock, content: e.target.value });
-                    }}
-                    placeholder={
-                      editingBlock.type === BlockType.MEDIA
-                        ? '/images/photo.jpg, video.mp4 or URL'
-                        : 'https://...'
-                    }
-                  />
-                  {editingBlock.type === BlockType.MEDIA && (
-                    <p className="text-[10px] text-gray-400 mt-1.5">
-                      Supports images, GIFs, and videos (.mp4, .webm, .mov)
-                    </p>
+                  {(editingBlock.type === BlockType.LINK ||
+                    editingBlock.type === BlockType.MEDIA ||
+                    editingBlock.type === BlockType.MAP) && (
+                    <>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                        {editingBlock.type === BlockType.MEDIA
+                          ? 'Media URL / Path'
+                          : editingBlock.type === BlockType.MAP
+                            ? 'Address / City'
+                            : 'Destination URL'}
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 focus:ring-2 focus:ring-black/5 focus:border-black focus:outline-none transition-all font-mono text-xs text-gray-600"
+                        value={
+                          editingBlock.type === BlockType.MEDIA
+                            ? editingBlockImageInput || ''
+                            : editingBlock.content || ''
+                        }
+                        onChange={(e) => {
+                          if (editingBlock.type === BlockType.MEDIA)
+                            updateBlock({ ...editingBlock, imageUrl: e.target.value });
+                          else updateBlock({ ...editingBlock, content: e.target.value });
+                        }}
+                        placeholder={
+                          editingBlock.type === BlockType.MEDIA
+                            ? '/images/photo.jpg, video.mp4 or URL'
+                            : 'https://...'
+                        }
+                      />
+                      {editingBlock.type === BlockType.MEDIA && (
+                        <p className="text-[10px] text-gray-400 mt-1.5">
+                          Supports images, GIFs, and videos (.mp4, .webm, .mov)
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               )}

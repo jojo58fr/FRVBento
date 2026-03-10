@@ -64,8 +64,12 @@ const Block = ({ block }: { block: BlockData }) => {
   const activeVideoId = block.youtubeVideoId || videos[0]?.id
   const isRichYT = isYoutube && activeVideoId && block.youtubeMode !== 'grid' && block.youtubeMode !== 'list'
   const isYTGrid = isYoutube && (block.youtubeMode === 'grid' || block.youtubeMode === 'list')
-  const isLinkImg = block.type === BlockType.LINK && block.imageUrl
   const blockOpacity = Math.min(1, Math.max(0, block.opacity ?? 1))
+  const hasImageBackground = !!block.imageUrl && (
+    block.type === BlockType.LINK ||
+    block.type === BlockType.TEXT ||
+    (block.type === BlockType.SOCIAL && !isYoutube)
+  )
 
   if (block.type === BlockType.SPACER) return <div style={{ borderRadius, ...gridStyle }} className="h-full" />
 
@@ -119,25 +123,26 @@ const Block = ({ block }: { block: BlockData }) => {
 
   let bgStyle: React.CSSProperties = block.customBackground ? { background: block.customBackground } : {}
   if (isRichYT) bgStyle = { backgroundImage: \`url(https://img.youtube.com/vi/\${activeVideoId}/maxresdefault.jpg)\`, backgroundSize: 'cover', backgroundPosition: 'center' }
-  else if (isLinkImg && block.imageUrl) bgStyle = { backgroundImage: \`url(\${block.imageUrl})\`, backgroundSize: 'cover', backgroundPosition: \`\${mediaPos.x}% \${mediaPos.y}%\` }
+  else if (hasImageBackground && block.imageUrl) bgStyle = { backgroundImage: \`url(\${block.imageUrl})\`, backgroundSize: 'cover', backgroundPosition: \`\${mediaPos.x}% \${mediaPos.y}%\` }
 
   return (
     <div onClick={handleClick} style={{ ...gridStyle }} className="cursor-pointer h-full transform-gpu">
       <div ref={elementRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
         style={{ borderRadius, ...tiltStyle, width: '100%', height: '100%', transformStyle: 'preserve-3d' }}
-        className={\`bento-item group relative overflow-hidden w-full h-full \${block.textColor || 'text-gray-900'} ring-1 ring-black/5 shadow-sm transition-all\`}>
-        {(isRichYT || isLinkImg || block.customBackground || block.color) && (
-          <div className={\`absolute inset-0 \${!block.customBackground && !isLinkImg && !isRichYT ? (block.color || 'bg-white') : ''}\`}
+        className={\`bento-item group relative overflow-hidden w-full h-full \${!block.customBackground && !hasImageBackground && !isRichYT ? (block.color || 'bg-white') : ''} \${block.textColor || 'text-gray-900'} ring-1 ring-black/5 shadow-sm transition-all\`}>
+        style={{ borderRadius, ...tiltStyle, width: '100%', height: '100%', transformStyle: 'preserve-3d' }}>
+        {(isRichYT || hasImageBackground || block.customBackground || block.color) && (
+          <div className={\`absolute inset-0 \${!block.customBackground && !hasImageBackground && !isRichYT ? (block.color || 'bg-white') : ''}\`}
             style={{ ...bgStyle, borderRadius, opacity: blockOpacity }} />
         )}
         <div className="absolute inset-0 pointer-events-none z-30 opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ background: 'radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255,255,255,0.25) 0%, transparent 60%)' }} />
-        {(isRichYT || isLinkImg) && (block.title || block.subtext) && (
+        {(isRichYT || hasImageBackground) && (block.title || block.subtext || block.content || block.channelTitle) && (
           <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-0"
             style={{ opacity: blockOpacity }} />
         )}
         <div className="w-full h-full relative z-10">
-          {block.type === BlockType.MEDIA && block.imageUrl ? (
+          {block.type === BlockType.MEDIA && block.imageUrl && !hasImageBackground ? (
             <div className="w-full h-full relative overflow-hidden">
               {/\\.(mp4|webm|ogg|mov)$/i.test(block.imageUrl) ? (
                 <video src={block.imageUrl} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\`, opacity: blockOpacity }} autoPlay loop muted playsInline />
@@ -178,16 +183,16 @@ const Block = ({ block }: { block: BlockData }) => {
                 const platform = SOCIAL_PLATFORMS[block.socialPlatform]
                 const Icon = platform?.icon
                 return Icon ? (
-                  <div className={\`w-7 h-7 rounded-lg flex items-center justify-center \${block.textColor === 'text-white' || isLinkImg ? 'bg-white/20 backdrop-blur-sm' : 'bg-gray-100'}\`}
+                  <div className={\`w-7 h-7 rounded-lg flex items-center justify-center \${block.textColor === 'text-white' || hasImageBackground ? 'bg-white/20 backdrop-blur-sm' : 'bg-gray-100'}\`}
                     style={{ color: block.textColor === 'text-brand' ? platform.brandColor : undefined }}>
                     <Icon size={14} />
                   </div>
                 ) : null
               })()}
               <div className={block.type === BlockType.TEXT ? 'flex flex-col justify-center h-full' : 'mt-auto'}>
-                <h3 className={\`font-bold leading-tight \${isLinkImg ? 'text-white drop-shadow-lg' : ''}\`}>{block.title}</h3>
-                {block.subtext && <p className={\`text-xs mt-1 \${isLinkImg ? 'text-white/80' : 'opacity-60'}\`}>{block.subtext}</p>}
-                {block.type === BlockType.TEXT && block.content && <p className="opacity-70 mt-2 text-sm whitespace-pre-wrap">{block.content}</p>}
+                <h3 className={\`font-bold leading-tight \${hasImageBackground ? 'text-white drop-shadow-lg' : ''}\`}>{block.title}</h3>
+                {block.subtext && <p className={\`text-xs mt-1 \${hasImageBackground ? 'text-white/80' : 'opacity-60'}\`}>{block.subtext}</p>}
+                {block.type === BlockType.TEXT && block.content && <p className={\`mt-2 text-sm whitespace-pre-wrap \${hasImageBackground ? 'text-white/85 drop-shadow-sm' : 'opacity-70'}\`}>{block.content}</p>}
               </div>
             </div>
           )}
