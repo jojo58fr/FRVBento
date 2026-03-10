@@ -1030,7 +1030,7 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 editingBlock.type === BlockType.SOCIAL) && (
                 <div>
                   {/* Image Upload for Block */}
-                  {(editingBlock.type === BlockType.MEDIA ||
+                  {((editingBlock.type === BlockType.MEDIA && !isMediaGalleryMode) ||
                     editingBlock.type === BlockType.LINK ||
                     editingBlock.type === BlockType.TEXT ||
                     editingBlock.type === BlockType.SOCIAL) && (
