@@ -15,6 +15,8 @@ import {
   Loader2,
   Database,
   Globe,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import type { SocialPlatform, UserProfile, BlockData, SavedBento } from '../types';
 import { AVATAR_PLACEHOLDER } from '../constants';
@@ -266,6 +268,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       socialAccounts: socialAccounts.map((acc) =>
         acc.platform === platform ? { ...acc, followerCount: numCount } : acc
       ),
+    });
+  };
+
+  const moveSocialAccount = (platform: SocialPlatform, direction: 'up' | 'down') => {
+    const currentIndex = socialAccounts.findIndex((acc) => acc.platform === platform);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= socialAccounts.length) return;
+
+    const reordered = [...socialAccounts];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    setProfile({
+      ...profile,
+      socialAccounts: reordered,
     });
   };
 
@@ -1074,18 +1093,40 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       </p>
                     )}
 
-                    {socialAccounts.map((account) => {
+                    {socialAccounts.map((account, index) => {
                       const option = getSocialPlatformOption(account.platform);
                       if (!option) return null;
                       const BrandIcon = option.brandIcon;
                       const FallbackIcon = option.icon;
                       const url = buildSocialUrl(account.platform, account.handle);
+                      const canMoveUp = index > 0;
+                      const canMoveDown = index < socialAccounts.length - 1;
 
                       return (
                         <div
                           key={account.platform}
                           className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl group"
                         >
+                          <div className="flex shrink-0 flex-col gap-1">
+                            <button
+                              type="button"
+                              onClick={() => moveSocialAccount(account.platform, 'up')}
+                              disabled={!canMoveUp}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-35"
+                              aria-label={`Move ${option.label} up`}
+                            >
+                              <ChevronUp size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveSocialAccount(account.platform, 'down')}
+                              disabled={!canMoveDown}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-35"
+                              aria-label={`Move ${option.label} down`}
+                            >
+                              <ChevronDown size={14} />
+                            </button>
+                          </div>
                           <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
                             {BrandIcon ? (
                               <span style={{ color: option.brandColor }}>

@@ -59,6 +59,7 @@ import {
   BarChart3,
   RefreshCw,
   AlertTriangle,
+  Info,
   Settings,
   Upload,
   FileDown,
@@ -815,6 +816,8 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
     cname: boolean;
     txt: boolean;
   } | null>(null);
+  const [showCustomDomainInfo, setShowCustomDomainInfo] = useState(false);
+  const [showCustomDomainHelpModal, setShowCustomDomainHelpModal] = useState(false);
   const [publicQrDataUrl, setPublicQrDataUrl] = useState<string | null>(null);
   const [publicQrLoading, setPublicQrLoading] = useState(false);
   const [publicQrError, setPublicQrError] = useState<string | null>(null);
@@ -3871,6 +3874,95 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
         }}
       />
 
+      <AnimatePresence>
+        {showCustomDomainHelpModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[85] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+            onClick={() => setShowCustomDomainHelpModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              transition={{ duration: 0.18 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Aide nom de domaine"
+              className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-gray-900/5"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between border-b border-gray-100 p-6 pb-4">
+                <div>
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-900 text-white">
+                    <Globe size={18} />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Associer mon nom de domaine
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Suis les étapes chez ton fournisseur DNS puis reviens cliquer sur
+                    &quot;Vérifier&quot;.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomDomainHelpModal(false)}
+                  className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100"
+                  aria-label="Fermer l'aide nom de domaine"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="max-h-[75vh] space-y-4 overflow-y-auto p-6">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  Ajoute d&apos;abord le domaine ici pour faire apparaître les valeurs DNS exactes
+                  à copier, puis configure-les dans Cloudflare ou OVH.
+                </div>
+
+                <section className="space-y-3 rounded-2xl border border-gray-200 p-4">
+                  <h3 className="text-base font-semibold text-gray-900">Cloudflare</h3>
+                  <ol className="list-decimal space-y-2 pl-5 text-sm text-gray-600">
+                    <li>Ouvre ton domaine dans le tableau de bord Cloudflare.</li>
+                    <li>Va dans l&apos;onglet DNS.</li>
+                    <li>Ajoute un record `TXT` avec le nom et la valeur affichés dans FRVBento.</li>
+                    <li>Ajoute un record `CNAME` avec la cible affichée dans FRVBento.</li>
+                    <li>
+                      Désactive le proxy Cloudflare sur le `CNAME` si l&apos;icône nuage est orange.
+                    </li>
+                    <li>Enregistre, attends la propagation DNS, puis clique sur &quot;Vérifier&quot;.</li>
+                  </ol>
+                </section>
+
+                <section className="space-y-3 rounded-2xl border border-gray-200 p-4">
+                  <h3 className="text-base font-semibold text-gray-900">OVH</h3>
+                  <ol className="list-decimal space-y-2 pl-5 text-sm text-gray-600">
+                    <li>Ouvre ton domaine dans le manager OVHcloud.</li>
+                    <li>Va dans la zone DNS.</li>
+                    <li>Ajoute une entrée `TXT` avec les informations fournies ici.</li>
+                    <li>Ajoute ensuite une entrée `CNAME` vers la cible indiquée.</li>
+                    <li>
+                      Si OVH demande un sous-domaine, reprends exactement l&apos;hôte affiché par
+                      FRVBento.
+                    </li>
+                    <li>Valide, attends quelques minutes, puis clique sur &quot;Vérifier&quot;.</li>
+                  </ol>
+                </section>
+
+                <section className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                  La propagation DNS peut prendre de quelques minutes à quelques heures selon le
+                  registrar. Tant que le `TXT` et le `CNAME` ne sont pas visibles, le statut
+                  restera en attente.
+                </section>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 7. DEPLOY MODAL */}
       <AnimatePresence>
         {showDeployModal && (
@@ -3993,9 +4085,32 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                       }`}
                     >
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          Nom de domaine personnalisé
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-gray-900">
+                            Nom de domaine personnalisé
+                          </p>
+                          <div
+                            className="relative"
+                            onMouseEnter={() => setShowCustomDomainInfo(true)}
+                            onMouseLeave={() => setShowCustomDomainInfo(false)}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setShowCustomDomainInfo((prev) => !prev)}
+                              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700"
+                              aria-label="En savoir plus sur le nom de domaine personnalisé"
+                              aria-expanded={showCustomDomainInfo}
+                            >
+                              <Info size={12} />
+                            </button>
+                            {showCustomDomainInfo && (
+                              <div className="absolute left-0 top-7 z-20 w-64 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600 shadow-xl">
+                                Cette fonctionnalité permet d&apos;utiliser votre propre domaine,
+                                par exemple `monsite.com`, à la place de l&apos;URL FRVBento.
+                              </div>
+                            )}
+                          </div>
+                        </div>
                         <p className="text-xs text-gray-500">
                           Associe un domaine à ton URL publiée.
                         </p>
@@ -4060,6 +4175,29 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                               : 'Vérifier'}
                           </button>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomDomainHelpModal(true)}
+                          className="group flex w-full items-center justify-between rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 via-white to-cyan-50 px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
+                        >
+                          <span className="flex items-center gap-3">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-700 ring-1 ring-sky-200">
+                              <Globe size={18} />
+                            </span>
+                            <span className="flex flex-col">
+                              <span className="text-sm font-semibold text-gray-900">
+                                Aides-moi à associer mon nom de domaine
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                Guide rapide pour Cloudflare et OVH
+                              </span>
+                            </span>
+                          </span>
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200 transition-colors group-hover:bg-sky-600 group-hover:text-white group-hover:ring-sky-600">
+                            Ouvrir
+                          </span>
+                        </button>
 
                         {customDomainError && (
                           <p className="text-xs text-red-600">{customDomainError}</p>
