@@ -16,6 +16,12 @@ enum BlockType {
 
 type SocialPlatform = 'x' | 'instagram' | 'tiktok' | 'youtube' | 'github' | 'gitlab' | 'linkedin' | 'facebook' | 'twitch' | 'dribbble' | 'medium' | 'devto' | 'reddit' | 'pinterest' | 'threads' | 'bluesky' | 'mastodon' | 'substack' | 'patreon' | 'kofi' | 'buymeacoffee' | 'website' | 'snapchat' | 'discord' | 'telegram' | 'whatsapp' | 'custom'
 
+interface MediaGalleryItem {
+  id: string
+  url: string
+  enabled: boolean
+}
+
 interface BlockData {
   id: string
   type: BlockType
@@ -23,6 +29,12 @@ interface BlockData {
   content?: string
   subtext?: string
   imageUrl?: string
+  mediaMode?: 'single' | 'gallery'
+  mediaGallery?: string[]
+  mediaGalleryItems?: MediaGalleryItem[]
+  mediaGalleryTransition?: 'fade' | 'slide' | 'zoom' | 'blur'
+  mediaGalleryIntervalMs?: number
+  mediaGalleryDurationMs?: number
   mediaPosition?: { x: number; y: number }
   colSpan: number
   rowSpan: number

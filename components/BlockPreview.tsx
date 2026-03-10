@@ -1,8 +1,16 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { BlockData, BlockType } from '../types';
 import { Youtube, Play, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { getSocialPlatformOption, inferSocialPlatformFromUrl } from '../socialPlatforms';
 import { openSafeUrl, isValidYouTubeChannelId, isValidLocationString } from '../utils/security';
+import {
+  MEDIA_GALLERY_DURATION_MS,
+  getMediaGalleryItems,
+  getMediaGalleryMotion,
+  isVideoMediaUrl,
+  MEDIA_GALLERY_INTERVAL_MS,
+} from '../utils/mediaGallery';
 
 // Apple TV style 3D tilt effect hook
 const useTiltEffect = (isEnabled: boolean = true) => {
@@ -78,8 +86,31 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
     Array<{ id: string; title: string; thumbnail: string }>
   >(block.youtubeVideos || []);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
 
   const mediaPosition = block.mediaPosition || { x: 50, y: 50 };
+  const mediaItems = getMediaGalleryItems(block);
+  const hasGallery =
+    block.type === BlockType.MEDIA && block.mediaMode === 'gallery' && mediaItems.length > 1;
+  const activeMediaUrl = mediaItems[activeMediaIndex] || block.imageUrl;
+  const mediaTransition = getMediaGalleryMotion(
+    block.mediaGalleryTransition || 'fade',
+    block.mediaGalleryDurationMs || MEDIA_GALLERY_DURATION_MS
+  );
+
+  useEffect(() => {
+    setActiveMediaIndex(0);
+  }, [block.id, block.imageUrl, block.mediaGallery]);
+
+  useEffect(() => {
+    if (!hasGallery) return;
+
+    const intervalId = window.setInterval(() => {
+      setActiveMediaIndex((current) => (current + 1) % mediaItems.length);
+    }, block.mediaGalleryIntervalMs || MEDIA_GALLERY_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [block.mediaGalleryIntervalMs, hasGallery, mediaItems.length]);
 
   // YouTube feed fetcher
   useEffect(() => {
@@ -125,6 +156,57 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
       setFetchedVideos(block.youtubeVideos || []);
     }
   }, [block.channelId, block.youtubeVideos, block.type]);
+
+  const renderMediaContent = () => {
+    if (!activeMediaUrl) return null;
+
+    if (isVideoMediaUrl(activeMediaUrl)) {
+      return (
+        <video
+          src={activeMediaUrl}
+          className="full-img"
+          style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
+      );
+    }
+
+    if (!hasGallery) {
+      return (
+        <img
+          src={activeMediaUrl}
+          alt={block.title || ''}
+          className="full-img"
+          style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
+          draggable={false}
+        />
+      );
+    }
+
+    return (
+      <AnimatePresence mode="sync">
+        <motion.div
+          key={activeMediaUrl}
+          className="absolute inset-0"
+          initial={mediaTransition.initial}
+          animate={mediaTransition.animate}
+          exit={mediaTransition.exit}
+          transition={mediaTransition.transition}
+        >
+          <img
+            src={activeMediaUrl}
+            alt={block.title || ''}
+            className="full-img"
+            style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
+            draggable={false}
+          />
+        </motion.div>
+      </AnimatePresence>
+    );
+  };
 
   // Border radius based on block size
   const getBorderRadius = () => {
@@ -412,25 +494,7 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
           {/* MEDIA BLOCK */}
           {block.type === BlockType.MEDIA && block.imageUrl && !isLinkWithImage ? (
             <div className="w-full h-full relative overflow-hidden">
-              {/\.(mp4|webm|ogg|mov)$/i.test(block.imageUrl) ? (
-                <video
-                  src={block.imageUrl}
-                  className="full-img"
-                  style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                />
-              ) : (
-                <img
-                  src={block.imageUrl}
-                  alt={block.title || ''}
-                  className="full-img"
-                  style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
-                  draggable={false}
-                />
-              )}
+              {renderMediaContent()}
               {block.title && (
                 <div className="media-overlay">
                   <p className={`media-title ${textSizes.overlayTitle}`}>{block.title}</p>

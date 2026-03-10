@@ -12,9 +12,16 @@ import {
   Trash2,
   CopyPlus,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { getSocialPlatformOption, inferSocialPlatformFromUrl } from '../socialPlatforms';
 import { openSafeUrl, isValidYouTubeChannelId, isValidLocationString } from '../utils/security';
+import {
+  MEDIA_GALLERY_DURATION_MS,
+  getMediaGalleryItems,
+  getMediaGalleryMotion,
+  isVideoMediaUrl,
+  MEDIA_GALLERY_INTERVAL_MS,
+} from '../utils/mediaGallery';
 
 // Apple TV style 3D tilt effect hook
 const useTiltEffect = (isEnabled: boolean = true) => {
@@ -138,6 +145,7 @@ const Block: React.FC<BlockProps> = ({
   const [mediaPosition, setMediaPosition] = useState<{ x: number; y: number }>(
     block.mediaPosition || { x: 50, y: 50 }
   );
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [dragStart, setDragStart] = useState<{
     x: number;
     y: number;
@@ -150,6 +158,29 @@ const Block: React.FC<BlockProps> = ({
   useEffect(() => {
     setMediaPosition(block.mediaPosition || { x: 50, y: 50 });
   }, [block.mediaPosition]);
+
+  const mediaItems = getMediaGalleryItems(block);
+  const hasGallery =
+    block.type === BlockType.MEDIA && block.mediaMode === 'gallery' && mediaItems.length > 1;
+  const activeMediaUrl = mediaItems[activeMediaIndex] || block.imageUrl;
+  const mediaTransition = getMediaGalleryMotion(
+    block.mediaGalleryTransition || 'fade',
+    block.mediaGalleryDurationMs || MEDIA_GALLERY_DURATION_MS
+  );
+
+  useEffect(() => {
+    setActiveMediaIndex(0);
+  }, [block.id, block.imageUrl, block.mediaGallery]);
+
+  useEffect(() => {
+    if (!hasGallery || isRepositioning) return;
+
+    const intervalId = window.setInterval(() => {
+      setActiveMediaIndex((current) => (current + 1) % mediaItems.length);
+    }, block.mediaGalleryIntervalMs || MEDIA_GALLERY_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [block.mediaGalleryIntervalMs, hasGallery, isRepositioning, mediaItems.length]);
 
   const handleMediaRepositionStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -656,6 +687,57 @@ const Block: React.FC<BlockProps> = ({
     };
   }
 
+  const renderMediaContent = () => {
+    if (!activeMediaUrl) return null;
+
+    if (isVideoMediaUrl(activeMediaUrl)) {
+      return (
+        <video
+          src={activeMediaUrl}
+          className="full-img"
+          style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
+      );
+    }
+
+    if (!hasGallery) {
+      return (
+        <img
+          src={activeMediaUrl}
+          alt={block.title || ''}
+          className="full-img"
+          style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
+          draggable={false}
+        />
+      );
+    }
+
+    return (
+      <AnimatePresence mode="sync">
+        <motion.div
+          key={activeMediaUrl}
+          className="absolute inset-0"
+          initial={mediaTransition.initial}
+          animate={mediaTransition.animate}
+          exit={mediaTransition.exit}
+          transition={mediaTransition.transition}
+        >
+          <img
+            src={activeMediaUrl}
+            alt={block.title || ''}
+            className="full-img"
+            style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
+            draggable={false}
+          />
+        </motion.div>
+      </AnimatePresence>
+    );
+  };
+
   // ===== YOUTUBE GRID/LIST LAYOUT (ADAPTIVE) =====
   if (isYoutubeGrid || isYoutubeList) {
     // Adaptive layout based on block size
@@ -1002,26 +1084,7 @@ const Block: React.FC<BlockProps> = ({
               onMouseDown={isRepositioning ? handleMediaRepositionStart : undefined}
               onTouchStart={isRepositioning ? handleMediaRepositionStart : undefined}
             >
-              {/* Check if it's a video or gif */}
-              {/\.(mp4|webm|ogg|mov)$/i.test(block.imageUrl) ? (
-                <video
-                  src={block.imageUrl}
-                  className="full-img"
-                  style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                />
-              ) : (
-                <img
-                  src={block.imageUrl}
-                  alt={block.title || ''}
-                  className="full-img"
-                  style={{ objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%` }}
-                  draggable={false}
-                />
-              )}
+              {renderMediaContent()}
 
               {/* Reposition button - appears on hover */}
               {!isRepositioning && onInlineUpdate && (

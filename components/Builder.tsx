@@ -714,6 +714,10 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
           gridColumn: undefined,
           gridRow: undefined,
           zIndex: undefined,
+          mediaGallery: source.mediaGallery ? [...source.mediaGallery] : undefined,
+          mediaGalleryItems: source.mediaGalleryItems
+            ? source.mediaGalleryItems.map((item) => ({ ...item }))
+            : undefined,
           mediaPosition: source.mediaPosition ? { ...source.mediaPosition } : undefined,
           youtubeVideos: source.youtubeVideos
             ? source.youtubeVideos.map((vid) => ({ ...vid }))

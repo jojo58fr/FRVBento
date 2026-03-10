@@ -36,6 +36,28 @@ export function extractImages(data: SiteData, assetsFolder: JSZip | null): Image
         imageMap[`block_${block.id}`] = `/assets/${filename}`;
       }
     }
+
+    block.mediaGallery?.forEach((item, index) => {
+      if (!item.startsWith('data:image')) return;
+
+      const blob = base64ToBlob(item);
+      if (blob && assetsFolder) {
+        const filename = `block-${block.id}-gallery-${index + 1}.png`;
+        assetsFolder.file(filename, blob);
+        imageMap[`block_${block.id}_gallery_${index}`] = `/assets/${filename}`;
+      }
+    });
+
+    block.mediaGalleryItems?.forEach((item, index) => {
+      if (!item.url.startsWith('data:image')) return;
+
+      const blob = base64ToBlob(item.url);
+      if (blob && assetsFolder) {
+        const filename = `block-${block.id}-gallery-item-${index + 1}.png`;
+        assetsFolder.file(filename, blob);
+        imageMap[`block_${block.id}_gallery_item_${index}`] = `/assets/${filename}`;
+      }
+    });
   }
 
   return imageMap;

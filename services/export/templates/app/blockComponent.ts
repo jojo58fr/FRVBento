@@ -8,7 +8,26 @@ const Block = ({ block }: { block: BlockData }) => {
   const { elementRef, tiltStyle, handleMouseMove, handleMouseLeave } = useTiltEffect(true)
   const [videos, setVideos] = useState(block.youtubeVideos || [])
   const [loading, setLoading] = useState(false)
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0)
+  const mediaDurationMs = block.mediaGalleryDurationMs || 600
   const mediaPos = block.mediaPosition || { x: 50, y: 50 }
+  const mediaItems = [block.imageUrl, ...(block.mediaGallery || [])]
+    .map(item => item?.trim() || '')
+    .filter((item, index, arr) => item && arr.indexOf(item) === index)
+  const hasGallery = block.type === BlockType.MEDIA && block.mediaMode === 'gallery' && mediaItems.length > 1
+  const activeMediaUrl = mediaItems[activeMediaIndex] || block.imageUrl
+
+  useEffect(() => {
+    setActiveMediaIndex(0)
+  }, [block.id, block.imageUrl, block.mediaGallery])
+
+  useEffect(() => {
+    if (!hasGallery) return
+    const intervalId = window.setInterval(() => {
+      setActiveMediaIndex(current => (current + 1) % mediaItems.length)
+    }, block.mediaGalleryIntervalMs || 4000)
+    return () => window.clearInterval(intervalId)
+  }, [block.mediaGalleryIntervalMs, hasGallery, mediaItems.length])
 
   useEffect(() => {
     if (block.type === BlockType.SOCIAL && block.channelId && !block.youtubeVideos?.length) {
@@ -65,6 +84,66 @@ const Block = ({ block }: { block: BlockData }) => {
   const isRichYT = isYoutube && activeVideoId && block.youtubeMode !== 'grid' && block.youtubeMode !== 'list'
   const isYTGrid = isYoutube && (block.youtubeMode === 'grid' || block.youtubeMode === 'list')
   const isLinkImg = block.type === BlockType.LINK && block.imageUrl
+
+  const mediaMotion = (() => {
+    switch (block.mediaGalleryTransition || 'fade') {
+      case 'slide':
+        return {
+          initial: { opacity: 0, x: 40 },
+          animate: { opacity: 1, x: 0 },
+          exit: { opacity: 0, x: -40 },
+          transition: { duration: Math.max(0.1, mediaDurationMs / 1000), ease: [0.22, 1, 0.36, 1] },
+        }
+      case 'zoom':
+        return {
+          initial: { opacity: 0, scale: 1.08 },
+          animate: { opacity: 1, scale: 1 },
+          exit: { opacity: 0, scale: 0.96 },
+          transition: { duration: Math.max(0.1, mediaDurationMs / 1000), ease: [0.22, 1, 0.36, 1] },
+        }
+      case 'blur':
+        return {
+          initial: { opacity: 0, filter: 'blur(18px)', scale: 1.03 },
+          animate: { opacity: 1, filter: 'blur(0px)', scale: 1 },
+          exit: { opacity: 0, filter: 'blur(18px)', scale: 1.01 },
+          transition: { duration: Math.max(0.1, mediaDurationMs / 1000), ease: 'easeInOut' },
+        }
+      case 'fade':
+      default:
+        return {
+          initial: { opacity: 0 },
+          animate: { opacity: 1 },
+          exit: { opacity: 0 },
+          transition: { duration: Math.max(0.1, mediaDurationMs / 1000), ease: 'easeInOut' },
+        }
+    }
+  })()
+
+  const renderMediaContent = () => {
+    if (!activeMediaUrl) return null
+
+    if (/\\.(mp4|webm|ogg|mov)$/i.test(activeMediaUrl)) {
+      return <video src={activeMediaUrl} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\` }} autoPlay loop muted playsInline />
+    }
+
+    if (!hasGallery) {
+      return <img src={activeMediaUrl} alt={block.title || ''} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\` }} />
+    }
+
+    return (
+      <AnimatePresence mode="sync">
+        <motion.div
+          key={activeMediaUrl}
+          className="absolute inset-0"
+          initial={mediaMotion.initial}
+          animate={mediaMotion.animate}
+          exit={mediaMotion.exit}
+          transition={mediaMotion.transition}>
+          <img src={activeMediaUrl} alt={block.title || ''} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\` }} />
+        </motion.div>
+      </AnimatePresence>
+    )
+  }
 
   if (block.type === BlockType.SPACER) return <div style={{ borderRadius, ...gridStyle }} className="h-full" />
 
@@ -129,11 +208,7 @@ const Block = ({ block }: { block: BlockData }) => {
         <div className="w-full h-full relative z-10">
           {block.type === BlockType.MEDIA && block.imageUrl ? (
             <div className="w-full h-full relative overflow-hidden">
-              {/\\.(mp4|webm|ogg|mov)$/i.test(block.imageUrl) ? (
-                <video src={block.imageUrl} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\` }} autoPlay loop muted playsInline />
-              ) : (
-                <img src={block.imageUrl} alt={block.title || ''} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\` }} />
-              )}
+              {renderMediaContent()}
               {block.title && <div className="media-overlay"><p className="media-title text-sm">{block.title}</p>{block.subtext && <p className="media-subtext">{block.subtext}</p>}</div>}
             </div>
           ) : block.type === BlockType.MAP ? (

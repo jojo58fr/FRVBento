@@ -20,6 +20,8 @@ import {
   List,
   Palette,
   CheckCircle2,
+  Images,
+  Sparkles,
 } from 'lucide-react';
 import {
   buildSocialUrl,
@@ -30,6 +32,12 @@ import {
   normalizeSocialHandle,
   SOCIAL_PLATFORM_OPTIONS,
 } from '../socialPlatforms';
+import MediaGalleryModal from './MediaGalleryModal';
+import {
+  createMediaGalleryItem,
+  normalizeMediaGalleryState,
+  syncMediaGalleryBlock,
+} from '../utils/mediaGallery';
 
 interface EditorSidebarProps {
   profile: UserProfile;
@@ -52,21 +60,66 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
 }) => {
   const [isFetching, setIsFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
 
   const handleBlockImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && editingBlock) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        updateBlock({ ...editingBlock, imageUrl: reader.result as string });
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !editingBlock) return;
+
+    if (editingBlock.type === BlockType.MEDIA && files.length > 1) {
+      Promise.all(
+        files.map(
+          (file) =>
+            new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = () => reject(new Error('Failed to read file'));
+              reader.readAsDataURL(file);
+            })
+        )
+      )
+        .then((results) => {
+          const currentItems = normalizeMediaGalleryState(editingBlock);
+          const nextItems = [...currentItems, ...results.map((result) => createMediaGalleryItem(result))];
+          updateBlock(
+            syncMediaGalleryBlock(
+              { ...editingBlock, mediaMode: 'gallery' },
+              nextItems,
+              editingBlock.mediaGalleryTransition || 'fade'
+            )
+          );
+        })
+        .catch((error) => {
+          console.error(error);
+        });
+      return;
     }
+
+    const file = files[0];
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const nextImageUrl = reader.result as string;
+      if (editingBlock.type === BlockType.MEDIA && editingBlock.mediaGalleryItems?.length) {
+        const currentItems = normalizeMediaGalleryState(editingBlock);
+        const nextItems = currentItems.map((item, index) =>
+          index === 0 ? { ...item, url: nextImageUrl, enabled: true } : item
+        );
+        updateBlock(
+          syncMediaGalleryBlock(editingBlock, nextItems, editingBlock.mediaGalleryTransition || 'fade')
+        );
+        return;
+      }
+
+      updateBlock({ ...editingBlock, imageUrl: nextImageUrl });
+    };
+    reader.readAsDataURL(file);
   };
 
   const isYouTubeActive =
     editingBlock?.type === BlockType.SOCIAL &&
     !!(editingBlock.channelId && editingBlock.channelId.length > 0);
+  const isMediaGalleryMode =
+    editingBlock?.type === BlockType.MEDIA && editingBlock.mediaMode === 'gallery';
 
   const resolvedSocialPlatform: SocialPlatform | undefined =
     editingBlock?.type === BlockType.SOCIAL
@@ -267,12 +320,13 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
   };
 
   return (
-    <aside
-      role="complementary"
-      aria-label="Block editor sidebar"
-      className={`fixed right-0 top-0 h-screen w-full md:w-[400px] bg-white z-50 shadow-xl transform transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col border-l border-gray-200
+    <>
+      <aside
+        role="complementary"
+        aria-label="Block editor sidebar"
+        className={`fixed right-0 top-0 h-screen w-full md:w-[400px] bg-white z-50 shadow-xl transform transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col border-l border-gray-200
 	        ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
-    >
+      >
       {/* Header */}
       <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-20">
         <div>
@@ -621,6 +675,47 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 </div>
               )}
 
+              {editingBlock.type === BlockType.MEDIA && (
+                <div className="space-y-4">
+                  <div className="p-1 bg-gray-100 rounded-xl flex">
+                    <button
+                      type="button"
+                      aria-pressed={!isMediaGalleryMode}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                        !isMediaGalleryMode
+                          ? 'bg-white shadow text-gray-900'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                      onClick={() =>
+                        updateBlock({
+                          ...editingBlock,
+                          mediaMode: 'single',
+                        })
+                      }
+                    >
+                      One Image
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={!!isMediaGalleryMode}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                        isMediaGalleryMode
+                          ? 'bg-white shadow text-gray-900'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                      onClick={() =>
+                        updateBlock({
+                          ...editingBlock,
+                          mediaMode: 'gallery',
+                        })
+                      }
+                    >
+                      Gallery Mode
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* 3. YOUTUBE SPECIFIC INPUTS */}
               {isYouTubeActive && (
                 <div className="p-5 bg-red-50 rounded-2xl border border-red-100 space-y-5">
@@ -733,7 +828,7 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 editingBlock.type === BlockType.MAP) && (
                 <div>
                   {/* Image Upload for Block */}
-                  {(editingBlock.type === BlockType.MEDIA ||
+                  {((editingBlock.type === BlockType.MEDIA && !isMediaGalleryMode) ||
                     editingBlock.type === BlockType.LINK) && (
                     <div className="mb-4">
                       <label
@@ -753,11 +848,16 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                           type="file"
                           className="sr-only"
                           accept="image/*"
+                          multiple={editingBlock.type === BlockType.MEDIA}
                           onChange={handleBlockImageUpload}
                         />
                         <div className="flex flex-col items-center gap-2 text-gray-500">
                           <Upload size={20} />
-                          <span className="text-xs">Click to upload</span>
+                          <span className="text-xs">
+                            {editingBlock.type === BlockType.MEDIA
+                              ? 'Click to upload one or more images'
+                              : 'Click to upload'}
+                          </span>
                         </div>
                         {editingBlock.imageUrl && (
                           <div className="mt-2 text-[10px] text-green-600 font-medium text-center">
@@ -768,36 +868,90 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     </div>
                   )}
 
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                    {editingBlock.type === BlockType.MEDIA
-                      ? 'Media URL / Path'
-                      : editingBlock.type === BlockType.MAP
-                        ? 'Address / City'
-                        : 'Destination URL'}
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 focus:ring-2 focus:ring-black/5 focus:border-black focus:outline-none transition-all font-mono text-xs text-gray-600"
-                    value={
-                      editingBlock.type === BlockType.MEDIA
-                        ? editingBlock.imageUrl || ''
-                        : editingBlock.content || ''
-                    }
-                    onChange={(e) => {
-                      if (editingBlock.type === BlockType.MEDIA)
-                        updateBlock({ ...editingBlock, imageUrl: e.target.value });
-                      else updateBlock({ ...editingBlock, content: e.target.value });
-                    }}
-                    placeholder={
-                      editingBlock.type === BlockType.MEDIA
-                        ? '/images/photo.jpg, video.mp4 or URL'
-                        : 'https://...'
-                    }
-                  />
+                  {!(editingBlock.type === BlockType.MEDIA && isMediaGalleryMode) && (
+                    <>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                        {editingBlock.type === BlockType.MEDIA
+                          ? 'Media URL / Path'
+                          : editingBlock.type === BlockType.MAP
+                            ? 'Address / City'
+                            : 'Destination URL'}
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 focus:ring-2 focus:ring-black/5 focus:border-black focus:outline-none transition-all font-mono text-xs text-gray-600"
+                        value={
+                          editingBlock.type === BlockType.MEDIA
+                            ? editingBlock.imageUrl || ''
+                            : editingBlock.content || ''
+                        }
+                        onChange={(e) => {
+                          if (editingBlock.type === BlockType.MEDIA)
+                            updateBlock({ ...editingBlock, imageUrl: e.target.value });
+                          else updateBlock({ ...editingBlock, content: e.target.value });
+                        }}
+                        placeholder={
+                          editingBlock.type === BlockType.MEDIA
+                            ? '/images/photo.jpg, video.mp4 or URL'
+                            : 'https://...'
+                        }
+                      />
+                      <p className="text-[10px] text-gray-400">
+                        Supports images, GIFs, and videos (.mp4, .webm, .mov)
+                      </p>
+                    </>
+                  )}
                   {editingBlock.type === BlockType.MEDIA && (
-                    <p className="text-[10px] text-gray-400 mt-1.5">
-                      Supports images, GIFs, and videos (.mp4, .webm, .mov)
-                    </p>
+                    <div className="mt-1.5 space-y-4">
+
+
+                      {isMediaGalleryMode && (
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                            Gallery
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setIsGalleryModalOpen(true)}
+                            className="w-full p-4 rounded-2xl bg-white border border-gray-200 text-left hover:bg-gray-50 hover:border-gray-300 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-2xl bg-gray-900 text-white flex items-center justify-center shadow-sm shrink-0">
+                                  <Images size={18} />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-gray-900 leading-tight">
+                                    Open gallery manager
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    Reorder images, toggle visibility and tune transitions.
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400 shrink-0">
+                                Edit
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gray-100 text-gray-700 text-xs font-medium">
+                                <Images size={12} />
+                                {
+                                  normalizeMediaGalleryState(editingBlock).filter((item) => item.enabled)
+                                    .length
+                                }{' '}
+                                active
+                              </div>
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+                                <Sparkles size={12} />
+                                {(editingBlock.mediaGalleryTransition || 'fade').toUpperCase()}
+                              </div>
+                            </div>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -949,7 +1103,15 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
           </p>
         </div>
       )}
-    </aside>
+      </aside>
+
+      <MediaGalleryModal
+        isOpen={isGalleryModalOpen}
+        block={editingBlock}
+        onClose={() => setIsGalleryModalOpen(false)}
+        onSave={updateBlock}
+      />
+    </>
   );
 };
 
