@@ -58,6 +58,7 @@ const normalizeProfile = (profile?: UserProfile): UserProfile => ({
   showBranding: profile?.showBranding ?? true,
   analytics: profile?.analytics || { enabled: false, supabaseUrl: '' },
   socialAccounts: profile?.socialAccounts || [],
+  socialIconStyle: profile?.socialIconStyle,
   avatarStyle: profile?.avatarStyle,
   showSocialInHeader: profile?.showSocialInHeader,
   showFollowerCount: profile?.showFollowerCount,

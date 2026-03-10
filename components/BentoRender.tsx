@@ -3,10 +3,10 @@ import type { AvatarStyle, SavedBento, BlockData } from '../types';
 import { BlockType } from '../types';
 import { resolveImageSrc } from '../utils/imageData';
 import Block from './Block';
-import { buildSocialUrl, formatFollowerCount, getSocialPlatformOption } from '../socialPlatforms';
 import { getMobileLayout, MOBILE_GRID_CONFIG } from '../utils/mobileLayout';
 import { ChevronDown } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import ProfileSocialIcons from './ProfileSocialIcons';
 
 interface BentoRenderProps {
   bento: SavedBento;
@@ -39,11 +39,6 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
   const isDark = profile.theme === 'dark';
   const headingText = isDark ? 'text-gray-100' : 'text-gray-900';
   const bodyText = isDark ? 'text-gray-300' : 'text-gray-500';
-  const socialBg = isDark
-    ? 'bg-gray-900/80 border border-gray-800 text-gray-100'
-    : 'bg-white';
-  const socialCountText = isDark ? 'text-gray-200' : 'text-gray-700';
-
   const applyThemeToBlock = (block: BlockData): BlockData => {
     if (block.customBackground || block.color) return block;
     return {
@@ -80,38 +75,7 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
 
   // Render social icons
   const renderSocialIcons = () => {
-    if (!profile.showSocialInHeader || !profile.socialAccounts?.length) return null;
-    return (
-      <div className="flex flex-wrap gap-3 mt-4">
-        {profile.socialAccounts.map((account) => {
-          const option = getSocialPlatformOption(account.platform);
-          if (!option) return null;
-          const BrandIcon = option.brandIcon;
-          const FallbackIcon = option.icon;
-          const url = buildSocialUrl(account.platform, account.handle);
-          const showCount = profile.showFollowerCount && account.followerCount;
-          return (
-            <a
-              key={account.platform}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`${showCount ? 'px-3 py-2' : 'w-10 h-10'} ${socialBg} rounded-full shadow-md flex items-center justify-center gap-2 hover:scale-105 hover:shadow-lg transition-all`}
-              title={option.label}
-            >
-              <span style={{ color: option.brandColor }}>
-                {BrandIcon ? <BrandIcon size={20} /> : <FallbackIcon size={20} />}
-              </span>
-              {showCount && (
-                <span className={`text-sm font-semibold ${socialCountText}`}>
-                  {formatFollowerCount(account.followerCount)}
-                </span>
-              )}
-            </a>
-          );
-        })}
-      </div>
-    );
+    return <ProfileSocialIcons profile={profile} isDark={isDark} />;
   };
 
   // Background style
@@ -414,37 +378,7 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
                 >
                   {profile.bio}
                 </p>
-                {profile.showSocialInHeader && profile.socialAccounts?.length > 0 && (
-                  <div className="flex flex-wrap justify-center gap-3 mt-4">
-                    {profile.socialAccounts.map((account) => {
-                      const option = getSocialPlatformOption(account.platform);
-                      if (!option) return null;
-                      const BrandIcon = option.brandIcon;
-                      const FallbackIcon = option.icon;
-                      const url = buildSocialUrl(account.platform, account.handle);
-                      const showCount = profile.showFollowerCount && account.followerCount;
-                      return (
-                        <a
-                          key={account.platform}
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`${showCount ? 'px-3 py-2' : 'w-10 h-10'} ${socialBg} rounded-full shadow-md flex items-center justify-center gap-2 font-semibold transition-transform hover:-translate-y-0.5`}
-                          title={option.label}
-                        >
-                          <span style={{ color: option.brandColor }}>
-                            {BrandIcon ? <BrandIcon size={20} /> : <FallbackIcon size={20} />}
-                          </span>
-                          {showCount && (
-                            <span className={`text-sm font-semibold ${socialCountText}`}>
-                              {formatFollowerCount(account.followerCount)}
-                            </span>
-                          )}
-                        </a>
-                      );
-                    })}
-                  </div>
-                )}
+                <ProfileSocialIcons profile={profile} isDark={isDark} centered />
               </div>
 
               <div className="p-4">

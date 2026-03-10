@@ -749,33 +749,36 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     {/* Show follower count */}
                     {profile.showSocialInHeader && (
-                      <div className="flex items-center justify-between gap-4 p-3 bg-white border border-gray-200 rounded-xl ml-4">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-gray-900">Show follower count</p>
-                          <p className="text-xs text-gray-400">
-                            Display follower numbers next to icons (e.g., 220k).
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setProfile({
-                              ...profile,
-                              showFollowerCount: !profile.showFollowerCount,
-                            })
-                          }
-                          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                            profile.showFollowerCount ? 'bg-gray-900' : 'bg-gray-200'
-                          }`}
-                          aria-pressed={profile.showFollowerCount}
-                          aria-label="Toggle follower count"
-                        >
-                          <span
-                            className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                              profile.showFollowerCount ? 'translate-x-6' : 'translate-x-1'
+                      <div className="space-y-4 ml-4">
+                        <div className="flex items-center justify-between gap-4 p-3 bg-white border border-gray-200 rounded-xl">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900">Show follower count</p>
+                            <p className="text-xs text-gray-400">
+                              Display follower numbers next to icons (e.g., 220k).
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setProfile({
+                                ...profile,
+                                showFollowerCount: !profile.showFollowerCount,
+                              })
+                            }
+                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                              profile.showFollowerCount ? 'bg-gray-900' : 'bg-gray-200'
                             }`}
-                          />
-                        </button>
+                            aria-pressed={profile.showFollowerCount}
+                            aria-label="Toggle follower count"
+                          >
+                            <span
+                              className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                                profile.showFollowerCount ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+
                       </div>
                     )}
                   </section>

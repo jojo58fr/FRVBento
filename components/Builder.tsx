@@ -21,6 +21,8 @@ import { useSaveStatus } from '../hooks/useSaveStatus';
 import { useFrvAuth } from '../hooks/useFrvAuth';
 import AvatarStyleModal from './AvatarStyleModal';
 import AIGeneratorModal from './AIGeneratorModal';
+import ProfileSocialIcons from './ProfileSocialIcons';
+import SocialIconStyleModal from './SocialIconStyleModal';
 import { exportSite, type ExportDeploymentTarget } from '../services/export';
 import {
   initializeApp,
@@ -38,7 +40,6 @@ import {
   listCustomDomains,
   verifyCustomDomain,
 } from '../services/customDomainService';
-import { getSocialPlatformOption, buildSocialUrl, formatFollowerCount } from '../socialPlatforms';
 import { getMobileLayout, MOBILE_GRID_CONFIG } from '../utils/mobileLayout';
 import { getImageDataUrlLength, prepareImageData, resolveImageSrc } from '../utils/imageData';
 import {
@@ -729,6 +730,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const [layoutChangeNotice, setLayoutChangeNotice] = useState<string | null>(null);
   const [showAvatarCropModal, setShowAvatarCropModal] = useState(false);
   const [showAvatarStyleModal, setShowAvatarStyleModal] = useState(false);
+  const [showSocialIconStyleModal, setShowSocialIconStyleModal] = useState(false);
   const [showAIGeneratorModal, setShowAIGeneratorModal] = useState(false);
   const [pendingAvatarSrc, setPendingAvatarSrc] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
@@ -750,10 +752,6 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
   const isDark = profile?.theme === 'dark';
   const headingText = isDark ? 'text-gray-100' : 'text-gray-900';
   const bodyText = isDark ? 'text-gray-300' : 'text-gray-500';
-  const socialBg = isDark
-    ? 'bg-gray-900/80 border border-gray-800 text-gray-100'
-    : 'bg-white';
-  const socialCountText = isDark ? 'text-gray-200' : 'text-gray-700';
   const nameHover = isDark ? 'hover:text-violet-300' : 'hover:text-violet-600';
 
   const applyThemeToBlock = useCallback(
@@ -2751,45 +2749,16 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                 )}
 
                 {/* Social icons row */}
-                {profile.showSocialInHeader &&
-                  profile.socialAccounts &&
-                  profile.socialAccounts.length > 0 && (
-                    <div className="flex flex-wrap gap-3 mt-4">
-                      {profile.socialAccounts.map((account) => {
-                        const option = getSocialPlatformOption(account.platform);
-                        if (!option) return null;
-                        const BrandIcon = option.brandIcon;
-                        const FallbackIcon = option.icon;
-                        const url = buildSocialUrl(account.platform, account.handle);
-                        const showCount = profile.showFollowerCount && account.followerCount;
-                        return (
-                          <a
-                            key={account.platform}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`${showCount ? 'px-3 py-2 rounded-full' : 'w-10 h-10 rounded-full'} ${socialBg} shadow-md flex items-center justify-center gap-2 hover:scale-105 hover:shadow-lg transition-all`}
-                            title={option.label}
-                          >
-                            {BrandIcon ? (
-                              <span style={{ color: option.brandColor }}>
-                                <BrandIcon size={20} />
-                              </span>
-                            ) : (
-                              <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>
-                                <FallbackIcon size={20} />
-                              </span>
-                            )}
-                            {showCount && (
-                              <span className={`text-sm font-semibold ${socialCountText}`}>
-                                {formatFollowerCount(account.followerCount)}
-                              </span>
-                            )}
-                          </a>
-                        );
-                      })}
-                    </div>
-                  )}
+                <ProfileSocialIcons
+                  profile={profile}
+                  isDark={isDark}
+                  interactive={viewMode !== 'desktop'}
+                  onClick={
+                    viewMode === 'desktop' && profile.showSocialInHeader
+                      ? () => setShowSocialIconStyleModal(true)
+                      : undefined
+                  }
+                />
               </div>
             </motion.div>
           </div>
@@ -2961,46 +2930,17 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                             )}
                           </div>
                         )}
-                        {profile.showSocialInHeader &&
-                          profile.socialAccounts &&
-                          profile.socialAccounts.length > 0 && (
-                            <div className="flex flex-wrap justify-center gap-3 mt-4">
-                              {profile.socialAccounts.map((account) => {
-                                const option = getSocialPlatformOption(account.platform);
-                                if (!option) return null;
-                                const BrandIcon = option.brandIcon;
-                                const FallbackIcon = option.icon;
-                                const url = buildSocialUrl(account.platform, account.handle);
-                                const showCount =
-                                  profile.showFollowerCount && account.followerCount;
-                                return (
-                                  <a
-                                    key={account.platform}
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={`${showCount ? 'px-3 py-2' : 'w-10 h-10'} ${socialBg} rounded-full shadow-md flex items-center justify-center gap-2 font-semibold transition-transform hover:-translate-y-0.5`}
-                                    title={option.label}
-                                  >
-                                    {BrandIcon ? (
-                                      <span style={{ color: option.brandColor }}>
-                                        <BrandIcon size={20} />
-                                      </span>
-                                    ) : (
-                                      <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>
-                                        <FallbackIcon size={20} />
-                                      </span>
-                                    )}
-                                    {showCount && (
-                                      <span className={`text-sm font-semibold ${socialCountText}`}>
-                                        {formatFollowerCount(account.followerCount)}
-                                      </span>
-                                    )}
-                                  </a>
-                                );
-                              })}
-                            </div>
-                          )}
+                        <ProfileSocialIcons
+                          profile={profile}
+                          isDark={isDark}
+                          centered
+                          interactive={viewMode !== 'desktop'}
+                          onClick={
+                            viewMode === 'desktop' && profile.showSocialInHeader
+                              ? () => setShowSocialIconStyleModal(true)
+                              : undefined
+                          }
+                        />
                       </div>
 
                       <div className="px-4 pb-8">
@@ -3378,46 +3318,13 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                             {profile.bio}
                           </p>
                           {/* Social icons row - Matches export's .profile-socials */}
-                          {profile.showSocialInHeader &&
-                            profile.socialAccounts &&
-                            profile.socialAccounts.length > 0 && (
-                              <div className="flex flex-wrap justify-center gap-3 mt-4">
-                                {profile.socialAccounts.map((account) => {
-                                  const option = getSocialPlatformOption(account.platform);
-                                  if (!option) return null;
-                                  const BrandIcon = option.brandIcon;
-                                  const FallbackIcon = option.icon;
-                                  const url = buildSocialUrl(account.platform, account.handle);
-                                  const showCount =
-                                    profile.showFollowerCount && account.followerCount;
-                                  return (
-                                    <a
-                                      key={account.platform}
-                                      href={url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className={`${showCount ? 'px-3 py-2' : 'w-10 h-10'} ${socialBg} rounded-full shadow-md flex items-center justify-center gap-2 font-semibold transition-transform hover:-translate-y-0.5`}
-                                      title={option.label}
-                                    >
-                                      {BrandIcon ? (
-                                        <span style={{ color: option.brandColor }}>
-                                          <BrandIcon size={20} />
-                                        </span>
-                                      ) : (
-                                        <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>
-                                          <FallbackIcon size={20} />
-                                        </span>
-                                      )}
-                                      {showCount && (
-                                        <span className={`text-sm font-semibold ${socialCountText}`}>
-                                          {formatFollowerCount(account.followerCount)}
-                                        </span>
-                                      )}
-                                    </a>
-                                  );
-                                })}
-                              </div>
-                            )}
+                          <ProfileSocialIcons
+                            profile={profile}
+                            isDark={isDark}
+                            centered
+                            interactive={false}
+                            onClick={() => setShowSocialIconStyleModal(true)}
+                          />
                         </div>
                         {/* Grid Section - Mobile layout: 2 columns adaptive */}
                         <div className="p-4 relative z-10">
@@ -3938,6 +3845,19 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
           }
         }
         onStyleChange={handleAvatarStyleChange}
+      />
+
+      <SocialIconStyleModal
+        isOpen={showSocialIconStyleModal}
+        onClose={() => setShowSocialIconStyleModal(false)}
+        profile={profile}
+        isDark={isDark}
+        onStyleChange={(style) =>
+          handleSetProfile((prev) => ({
+            ...prev,
+            socialIconStyle: style,
+          }))
+        }
       />
 
       {/* 6. AI GENERATOR MODAL */}

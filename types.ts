@@ -97,6 +97,20 @@ export interface AvatarStyle {
   borderWidth?: number; // border width in pixels (default: 3)
 }
 
+export interface SocialIconStyle {
+  shape: 'circle' | 'square' | 'rounded';
+  useBrandColor?: boolean;
+  iconColor?: string;
+  backgroundColor?: string;
+  backgroundOpacity?: number;
+  blur?: boolean;
+  blurStrength?: number;
+  shadow?: boolean;
+  border?: boolean;
+  borderColor?: string;
+  borderWidth?: number;
+}
+
 // OpenGraph meta tags for social sharing
 export interface OpenGraphData {
   title?: string; // Title for social previews (defaults to profile name)
@@ -120,6 +134,7 @@ export interface UserProfile {
   showBranding?: boolean;
   showSocialInHeader?: boolean; // Show social icons row under name/bio
   showFollowerCount?: boolean; // Show follower count next to social icons
+  socialIconStyle?: SocialIconStyle;
   // Background customization
   backgroundColor?: string; // CSS color value (hex, rgb, etc.)
   backgroundImage?: string | ImageData; // URL or data URL for background image
