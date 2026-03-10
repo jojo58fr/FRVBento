@@ -477,6 +477,7 @@ If data needs confirmation → First ask your questions, then provide the JSON a
           subtext: block.subtext || '',
           content: block.content || '',
           opacity: typeof block.opacity === 'number' ? block.opacity : 1,
+          imageBlur: typeof block.imageBlur === 'number' ? block.imageBlur : 0,
           colSpan: block.colSpan || 3,
           rowSpan: block.rowSpan || 3,
           gridColumn: block.gridColumn || 1,

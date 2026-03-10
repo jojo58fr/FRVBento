@@ -65,6 +65,7 @@ const Block = ({ block }: { block: BlockData }) => {
   const isRichYT = isYoutube && activeVideoId && block.youtubeMode !== 'grid' && block.youtubeMode !== 'list'
   const isYTGrid = isYoutube && (block.youtubeMode === 'grid' || block.youtubeMode === 'list')
   const blockOpacity = Math.min(1, Math.max(0, block.opacity ?? 1))
+  const imageBlur = Math.min(20, Math.max(0, block.imageBlur ?? 0))
   const hasImageBackground = !!block.imageUrl && (
     block.type === BlockType.LINK ||
     block.type === BlockType.TEXT ||
@@ -124,16 +125,25 @@ const Block = ({ block }: { block: BlockData }) => {
   let bgStyle: React.CSSProperties = block.customBackground ? { background: block.customBackground } : {}
   if (isRichYT) bgStyle = { backgroundImage: \`url(https://img.youtube.com/vi/\${activeVideoId}/maxresdefault.jpg)\`, backgroundSize: 'cover', backgroundPosition: 'center' }
   else if (hasImageBackground && block.imageUrl) bgStyle = { backgroundImage: \`url(\${block.imageUrl})\`, backgroundSize: 'cover', backgroundPosition: \`\${mediaPos.x}% \${mediaPos.y}%\` }
+  const backgroundLayerStyle: React.CSSProperties = {
+    ...bgStyle,
+    borderRadius,
+    opacity: blockOpacity,
+    ...(hasImageBackground && imageBlur > 0 ? {
+      filter: \`blur(\${imageBlur}px)\`,
+      transform: \`scale(\${1 + imageBlur / 60})\`,
+      transformOrigin: 'center',
+    } : {}),
+  }
 
   return (
     <div onClick={handleClick} style={{ ...gridStyle }} className="cursor-pointer h-full transform-gpu">
       <div ref={elementRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
         style={{ borderRadius, ...tiltStyle, width: '100%', height: '100%', transformStyle: 'preserve-3d' }}
         className={\`bento-item group relative overflow-hidden w-full h-full \${!block.customBackground && !hasImageBackground && !isRichYT ? (block.color || 'bg-white') : ''} \${block.textColor || 'text-gray-900'} ring-1 ring-black/5 shadow-sm transition-all\`}>
-        style={{ borderRadius, ...tiltStyle, width: '100%', height: '100%', transformStyle: 'preserve-3d' }}>
         {(isRichYT || hasImageBackground || block.customBackground || block.color) && (
           <div className={\`absolute inset-0 \${!block.customBackground && !hasImageBackground && !isRichYT ? (block.color || 'bg-white') : ''}\`}
-            style={{ ...bgStyle, borderRadius, opacity: blockOpacity }} />
+            style={backgroundLayerStyle} />
         )}
         <div className="absolute inset-0 pointer-events-none z-30 opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ background: 'radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255,255,255,0.25) 0%, transparent 60%)' }} />

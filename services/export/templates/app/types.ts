@@ -26,6 +26,7 @@ interface BlockData {
   subtext?: string
   opacity?: number
   imageUrl?: string
+  imageBlur?: number
   mediaPosition?: { x: number; y: number }
   colSpan: number
   rowSpan: number

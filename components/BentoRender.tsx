@@ -4,7 +4,7 @@ import { BlockType } from '../types';
 import { resolveImageSrc } from '../utils/imageData';
 import Block from './Block';
 import { getMobileLayout, MOBILE_GRID_CONFIG } from '../utils/mobileLayout';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Moon, Palette, Sun } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import ProfileSocialIcons from './ProfileSocialIcons';
 
@@ -14,6 +14,7 @@ interface BentoRenderProps {
 
 const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
   const [expandedCollections, setExpandedCollections] = useState<Record<string, boolean>>({});
+  const [themeMode, setThemeMode] = useState<'custom' | 'light' | 'dark'>('light');
 
   // Avatar style helpers
   const getAvatarStyle = (style?: AvatarStyle): React.CSSProperties => {
@@ -36,7 +37,16 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
   const pageLayout = profile.pageLayout || 'bento';
   const avatarSrc = resolveImageSrc(profile.avatarUrl);
   const backgroundSrc = resolveImageSrc(profile.backgroundImage);
-  const isDark = profile.theme === 'dark';
+  const hasCustomBackground =
+    !!backgroundSrc ||
+    !!(
+      profile.backgroundColor &&
+      profile.backgroundColor.toLowerCase() !== '#f8fafc' &&
+      profile.backgroundColor.toLowerCase() !== '#0b0b0f'
+    );
+  const effectiveTheme =
+    themeMode === 'custom' ? (profile.theme === 'dark' ? 'dark' : 'light') : themeMode;
+  const isDark = effectiveTheme === 'dark';
   const headingText = isDark ? 'text-gray-100' : 'text-gray-900';
   const bodyText = isDark ? 'text-gray-300' : 'text-gray-500';
   const applyThemeToBlock = (block: BlockData): BlockData => {
@@ -73,24 +83,62 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
     });
   }, [blocks]);
 
+  useEffect(() => {
+    const storageKey = `openbento-theme-${bento.id}`;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored === 'custom' || stored === 'light' || stored === 'dark') {
+        setThemeMode(stored);
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
+    setThemeMode(hasCustomBackground ? 'custom' : profile.theme === 'dark' ? 'dark' : 'light');
+  }, [bento.id, profile.theme, hasCustomBackground]);
+
   // Render social icons
   const renderSocialIcons = () => {
     return <ProfileSocialIcons profile={profile} isDark={isDark} />;
   };
 
   // Background style
-  const bgStyle: React.CSSProperties = backgroundSrc
-    ? {
-        backgroundImage: `url('${backgroundSrc}')`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed',
-      }
-    : { backgroundColor: profile.backgroundColor || (isDark ? '#0b0b0f' : '#f8fafc') };
+  const bgStyle: React.CSSProperties =
+    themeMode === 'custom'
+      ? backgroundSrc
+        ? {
+            backgroundImage: `url('${backgroundSrc}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed',
+          }
+        : { backgroundColor: profile.backgroundColor || (isDark ? '#0b0b0f' : '#f8fafc') }
+      : {
+          backgroundColor: themeMode === 'dark' ? '#0b0b0f' : '#f8fafc',
+        };
 
   const avatarStyle = getAvatarStyle(profile.avatarStyle);
   const nameStyle = profile.nameColor ? { color: profile.nameColor } : undefined;
   const bioStyle = profile.bioColor ? { color: profile.bioColor } : undefined;
+  const toggleTheme = () => {
+    const nextTheme =
+      hasCustomBackground
+        ? themeMode === 'custom'
+          ? 'dark'
+          : themeMode === 'dark'
+            ? 'light'
+            : 'custom'
+        : isDark
+          ? 'light'
+          : 'dark';
+    setThemeMode(nextTheme);
+    try {
+      localStorage.setItem(`openbento-theme-${bento.id}`, nextTheme);
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <div
@@ -101,7 +149,7 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
         <style>{profile.customCss}</style>
       )}
       {/* Background blur overlay */}
-      {backgroundSrc && profile.backgroundBlur && profile.backgroundBlur > 0 && (
+      {themeMode === 'custom' && backgroundSrc && profile.backgroundBlur && profile.backgroundBlur > 0 && (
         <div
           className="fixed inset-0 z-0 pointer-events-none"
           style={{
@@ -112,6 +160,50 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
       )}
 
       <div className="relative z-10">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={
+            hasCustomBackground
+              ? themeMode === 'custom'
+                ? 'Switch to dark mode'
+                : themeMode === 'dark'
+                  ? 'Switch to light mode'
+                  : 'Switch to custom mode'
+              : isDark
+                ? 'Switch to light mode'
+                : 'Switch to dark mode'
+          }
+          className={`fixed top-4 left-4 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full border transition-all ${
+            themeMode === 'custom'
+              ? isDark
+                ? 'border-[#3a312b] bg-[#181311] text-[#f7efe8] hover:bg-[#241c19]'
+                : 'border-[#d8cec5] bg-[#f6efe8] text-[#3f342d] hover:bg-[#fff8f2]'
+              : isDark
+                ? 'border-white/10 bg-[#111111] text-white hover:bg-[#1a1a1a]'
+                : 'border-black/10 bg-[#f4f4f4] text-gray-900 hover:bg-[#ffffff]'
+          }`}
+          style={{
+            backdropFilter: themeMode === 'custom' ? 'blur(10px)' : undefined,
+            WebkitBackdropFilter: themeMode === 'custom' ? 'blur(10px)' : undefined,
+            boxShadow: themeMode === 'custom'
+              ? isDark
+                ? '0 10px 24px rgba(0,0,0,0.3)'
+                : '0 10px 24px rgba(79,56,40,0.12)'
+              : isDark
+                ? '0 10px 24px rgba(0,0,0,0.22)'
+                : '0 10px 24px rgba(0,0,0,0.08)',
+          }}
+        >
+          {themeMode === 'custom' ? (
+            <Palette size={16} />
+          ) : isDark ? (
+            <Sun size={16} />
+          ) : (
+            <Moon size={16} />
+          )}
+        </button>
+
         {pageLayout === 'vertical-links' ? (
           <div className="mx-auto w-full max-w-2xl px-4 pt-8 pb-8">
             <div className="flex flex-col items-center text-center">

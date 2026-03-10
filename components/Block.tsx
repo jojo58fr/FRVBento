@@ -643,6 +643,7 @@ const Block: React.FC<BlockProps> = ({
   const isYoutubeGrid = isYoutube && block.youtubeMode === 'grid';
   const isYoutubeList = isYoutube && block.youtubeMode === 'list';
   const resolvedImageUrl = resolveImageSrc(block.imageUrl);
+  const imageBlur = Math.min(20, Math.max(0, block.imageBlur ?? 0));
   const hasImageBackground =
     !!resolvedImageUrl &&
     (block.type === BlockType.LINK ||
@@ -662,13 +663,25 @@ const Block: React.FC<BlockProps> = ({
       backgroundPosition: 'center',
     };
   } else if (hasImageBackground && resolvedImageUrl) {
-      const pos = mediaPosition;
-      finalStyle = {
-        backgroundImage: `url(${resolvedImageUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: `${pos.x}% ${pos.y}%`,
-      };
+    const pos = mediaPosition;
+    finalStyle = {
+      backgroundImage: `url(${resolvedImageUrl})`,
+      backgroundSize: 'cover',
+      backgroundPosition: `${pos.x}% ${pos.y}%`,
+    };
   }
+  const backgroundLayerStyle: React.CSSProperties = {
+    ...finalStyle,
+    borderRadius,
+    opacity: blockOpacity,
+    ...(hasImageBackground && imageBlur > 0
+      ? {
+          filter: `blur(${imageBlur}px)`,
+          transform: `scale(${1 + imageBlur / 60})`,
+          transformOrigin: 'center',
+        }
+      : {}),
+  };
 
   // ===== YOUTUBE GRID/LIST LAYOUT (ADAPTIVE) =====
   if (isYoutubeGrid || isYoutubeList) {
@@ -885,7 +898,6 @@ const Block: React.FC<BlockProps> = ({
         onMouseEnter={enableTiltEffect ? onTiltEnter : undefined}
         style={{ borderRadius, ...tiltWrapperStyle }}
         className={`bento-item group relative overflow-hidden w-full h-full ${!block.customBackground && !hasImageBackground && !isRichYoutube ? block.color || 'bg-white' : ''} ${block.textColor || 'text-gray-900'}
-        style={{ borderRadius, ...tiltWrapperStyle }}
           ${isSelected ? 'ring-4 ring-blue-500 shadow-xl' : 'ring-1 ring-black/5'}
           ${!isSelected && !enableTiltEffect ? 'shadow-sm hover:shadow-xl' : 'shadow-sm'}
           ${isDragTarget ? 'ring-2 ring-violet-500' : ''}
@@ -896,11 +908,7 @@ const Block: React.FC<BlockProps> = ({
         {(isRichYoutube || hasImageBackground || block.customBackground || block.color) && (
           <div
             className={`absolute inset-0 ${!block.customBackground && !hasImageBackground && !isRichYoutube ? block.color || 'bg-white' : ''}`}
-            style={{
-              ...finalStyle,
-              borderRadius,
-              opacity: blockOpacity,
-            }}
+            style={backgroundLayerStyle}
           />
         )}
         {/* Drop indicator */}

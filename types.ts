@@ -55,6 +55,7 @@ export interface BlockData {
   subtext?: string;
   opacity?: number; // 0-1
   imageUrl?: string | ImageData;
+  imageBlur?: number; // Blur amount for image backgrounds (0-20)
   mediaPosition?: { x: number; y: number }; // Object position for media (0-100 for each axis)
   colSpan: number; // 1-9 (9-col grid)
   rowSpan: number; // 1+ (builder clamps to 50)

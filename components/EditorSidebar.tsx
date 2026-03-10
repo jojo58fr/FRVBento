@@ -342,6 +342,13 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
   const blockOpacityPercent = editingBlock
     ? Math.round(Math.min(1, Math.max(0, editingBlock.opacity ?? 1)) * 100)
     : 100;
+  const blockImageBlur = editingBlock ? Math.min(20, Math.max(0, editingBlock.imageBlur ?? 0)) : 0;
+  const supportsImageBackgroundBlur =
+    !!editingBlock?.imageUrl &&
+    (editingBlock.type === BlockType.LINK ||
+      editingBlock.type === BlockType.TEXT ||
+      (editingBlock.type === BlockType.SOCIAL &&
+        !(editingBlock.channelId && editingBlock.channelId.length > 0)));
 
   return (
     <aside
@@ -1108,6 +1115,31 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     className="w-full accent-gray-900"
                   />
                 </div>
+
+                {supportsImageBackgroundBlur && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        Image Blur
+                      </label>
+                      <span className="text-xs font-semibold text-gray-500">{blockImageBlur}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="20"
+                      step="1"
+                      value={blockImageBlur}
+                      onChange={(e) =>
+                        updateBlock({
+                          ...editingBlock,
+                          imageBlur: Number(e.target.value),
+                        })
+                      }
+                      className="w-full accent-gray-900"
+                    />
+                  </div>
+                )}
 
                 {/* Solid Colors */}
                 <div className="space-y-2">

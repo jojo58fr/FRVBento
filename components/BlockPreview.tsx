@@ -240,6 +240,7 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
   const isYoutubeGrid = isYoutube && (block.youtubeMode === 'grid' || block.youtubeMode === 'list');
   const resolvedImageUrl = resolveImageSrc(block.imageUrl);
   const blockOpacity = Math.min(1, Math.max(0, block.opacity ?? 1));
+  const imageBlur = Math.min(20, Math.max(0, block.imageBlur ?? 0));
   const hasImageBackground =
     !!resolvedImageUrl &&
     (block.type === BlockType.LINK ||
@@ -263,6 +264,18 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
         backgroundPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
       };
   }
+  const backgroundLayerStyle: React.CSSProperties = {
+    ...finalStyle,
+    borderRadius,
+    opacity: blockOpacity,
+    ...(hasImageBackground && imageBlur > 0
+      ? {
+          filter: `blur(${imageBlur}px)`,
+          transform: `scale(${1 + imageBlur / 60})`,
+          transformOrigin: 'center',
+        }
+      : {}),
+  };
 
   // ===== SPACER BLOCK =====
   if (block.type === BlockType.SPACER) {
@@ -418,7 +431,7 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
         {(isRichYoutube || hasImageBackground || block.customBackground || block.color) && (
           <div
             className={`absolute inset-0 ${!block.customBackground && !hasImageBackground && !isRichYoutube ? block.color || 'bg-white' : ''}`}
-            style={{ ...finalStyle, borderRadius, opacity: blockOpacity }}
+            style={backgroundLayerStyle}
           />
         )}
         {/* Glare effect */}
