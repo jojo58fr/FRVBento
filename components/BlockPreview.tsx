@@ -4,6 +4,14 @@ import { Youtube, Play, Loader2 } from 'lucide-react';
 import { getSocialPlatformOption, inferSocialPlatformFromUrl } from '../socialPlatforms';
 import { openSafeUrl, isValidYouTubeChannelId, isValidLocationString } from '../utils/security';
 import { resolveImageSrc } from '../utils/imageData';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  MEDIA_GALLERY_DURATION_MS,
+  MEDIA_GALLERY_INTERVAL_MS,
+  getMediaGalleryItems,
+  getMediaGalleryMotion,
+  isVideoMediaUrl,
+} from '../utils/mediaGallery';
 import FluidTextEffect from './FluidTextEffect';
 
 // Apple TV style 3D tilt effect hook
@@ -80,8 +88,17 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
     Array<{ id: string; title: string; thumbnail: string }>
   >(block.youtubeVideos || []);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
 
   const mediaPosition = block.mediaPosition || { x: 50, y: 50 };
+  const mediaItems = getMediaGalleryItems(block);
+  const hasGallery =
+    block.type === BlockType.MEDIA && block.mediaMode === 'gallery' && mediaItems.length > 1;
+  const activeMediaUrl = mediaItems[activeMediaIndex] || resolveImageSrc(block.imageUrl);
+  const mediaTransition = getMediaGalleryMotion(
+    block.mediaGalleryTransition || 'fade',
+    block.mediaGalleryDurationMs || MEDIA_GALLERY_DURATION_MS
+  );
 
   // YouTube feed fetcher
   useEffect(() => {
@@ -127,6 +144,20 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
       setFetchedVideos(block.youtubeVideos || []);
     }
   }, [block.channelId, block.youtubeVideos, block.type]);
+
+  useEffect(() => {
+    setActiveMediaIndex(0);
+  }, [block.id, block.imageUrl, block.mediaGallery, block.mediaGalleryItems]);
+
+  useEffect(() => {
+    if (!hasGallery) return;
+
+    const intervalId = window.setInterval(() => {
+      setActiveMediaIndex((current) => (current + 1) % mediaItems.length);
+    }, block.mediaGalleryIntervalMs || MEDIA_GALLERY_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [block.mediaGalleryIntervalMs, hasGallery, mediaItems.length]);
 
   // Border radius based on block size
   const getBorderRadius = () => {
@@ -275,6 +306,66 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
           transformOrigin: 'center',
         }
       : {}),
+  };
+
+  const renderMediaContent = () => {
+    if (!activeMediaUrl) return null;
+
+    if (isVideoMediaUrl(activeMediaUrl)) {
+      return (
+        <video
+          src={activeMediaUrl}
+          className="full-img"
+          style={{
+            objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
+            opacity: blockOpacity,
+          }}
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
+      );
+    }
+
+    if (!hasGallery) {
+      return (
+        <img
+          src={activeMediaUrl}
+          alt={block.title || ''}
+          className="full-img"
+          style={{
+            objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
+            opacity: blockOpacity,
+          }}
+          draggable={false}
+        />
+      );
+    }
+
+    return (
+      <AnimatePresence mode="sync">
+        <motion.div
+          key={activeMediaUrl}
+          className="absolute inset-0"
+          initial={mediaTransition.initial}
+          animate={mediaTransition.animate}
+          exit={mediaTransition.exit}
+          transition={mediaTransition.transition}
+        >
+          <img
+            src={activeMediaUrl}
+            alt={block.title || ''}
+            className="full-img"
+            style={{
+              objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
+              opacity: blockOpacity,
+            }}
+            draggable={false}
+          />
+        </motion.div>
+      </AnimatePresence>
+    );
   };
 
   // ===== SPACER BLOCK =====
@@ -455,33 +546,9 @@ const BlockPreview: React.FC<BlockPreviewProps> = ({
 
         <div className="w-full h-full pointer-events-none relative z-10">
           {/* MEDIA BLOCK */}
-          {block.type === BlockType.MEDIA && resolvedImageUrl && !hasImageBackground ? (
+          {block.type === BlockType.MEDIA && activeMediaUrl && !hasImageBackground ? (
             <div className="w-full h-full relative overflow-hidden">
-              {/\.(mp4|webm|ogg|mov)$/i.test(resolvedImageUrl) ? (
-                <video
-                  src={resolvedImageUrl}
-                  className="full-img"
-                  style={{
-                    objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
-                    opacity: blockOpacity,
-                  }}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                />
-              ) : (
-                <img
-                  src={resolvedImageUrl}
-                  alt={block.title || ''}
-                  className="full-img"
-                  style={{
-                    objectPosition: `${mediaPosition.x}% ${mediaPosition.y}%`,
-                    opacity: blockOpacity,
-                  }}
-                  draggable={false}
-                />
-              )}
+              {renderMediaContent()}
               {block.title && (
                 <div className="media-overlay">
                   <p className={`media-title ${textSizes.overlayTitle}`}>{block.title}</p>

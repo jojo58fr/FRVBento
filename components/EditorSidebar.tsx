@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   Droplets,
   FolderTree,
+  Images,
   Search,
 } from 'lucide-react';
 import {
@@ -34,7 +35,13 @@ import {
   normalizeSocialHandle,
   SOCIAL_PLATFORM_OPTIONS,
 } from '../socialPlatforms';
+import MediaGalleryModal from './MediaGalleryModal';
 import { prepareImageData, resolveImageSrc } from '../utils/imageData';
+import {
+  createMediaGalleryItem,
+  normalizeMediaGalleryState,
+  syncMediaGalleryBlock,
+} from '../utils/mediaGallery';
 
 interface EditorSidebarProps {
   profile: UserProfile;
@@ -61,6 +68,7 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [imageNotice, setImageNotice] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
   const blockImageInputRef = useRef<HTMLInputElement | null>(null);
   const [platformSearch, setPlatformSearch] = useState('');
 
@@ -74,36 +82,78 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
   }, [imageNotice, imageError]);
 
   const handleBlockImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && editingBlock) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        void (async () => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !editingBlock) return;
+
+    const getNoticeText = (notices: string[]) => {
+      const parts: string[] = [];
+      if (notices.includes('animated-webp')) parts.push('GIF converti en WebP animé');
+      if (notices.includes('gif')) parts.push('GIF conservé');
+      if (notices.includes('compressed')) parts.push('Image compressée');
+      if (notices.includes('chunked'))
+        parts.push('Image grande, sauvegardée en plusieurs morceaux pour l’export');
+      return parts.join(' · ');
+    };
+
+    const readPreparedFile = async (file: File) =>
+      new Promise<Awaited<ReturnType<typeof prepareImageData>>>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
           try {
-            setImageError(null);
-            const raw = reader.result as string;
-            const { image, notices } = await prepareImageData(raw);
-            updateBlock({ ...editingBlock, imageUrl: image });
-            e.target.value = '';
-            if (notices.length > 0) {
-              const parts: string[] = [];
-              if (notices.includes('animated-webp')) parts.push('GIF converti en WebP animé');
-              if (notices.includes('gif')) parts.push('GIF conservé');
-              if (notices.includes('compressed')) parts.push('Image compressée');
-              if (notices.includes('chunked'))
-                parts.push('Image grande, sauvegardée en plusieurs morceaux pour l’export');
-              setImageNotice(parts.join(' · '));
-            } else {
-              setImageNotice(null);
-            }
+            resolve(await prepareImageData(reader.result as string));
           } catch (error) {
-            const message = error instanceof Error ? error.message : 'Image invalide';
-            setImageError(message);
+            reject(error);
           }
-        })();
-      };
-      reader.readAsDataURL(file);
-    }
+        };
+        reader.onerror = () => reject(new Error('Image invalide'));
+        reader.readAsDataURL(file);
+      });
+
+    void (async () => {
+      try {
+        setImageError(null);
+        const preparedFiles = await Promise.all(files.map((file) => readPreparedFile(file)));
+
+        if (editingBlock.type === BlockType.MEDIA && files.length > 1) {
+          const currentItems = normalizeMediaGalleryState(editingBlock);
+          const nextItems = [
+            ...currentItems,
+            ...preparedFiles.map(({ image }) => createMediaGalleryItem(image)),
+          ];
+          updateBlock(
+            syncMediaGalleryBlock(
+              { ...editingBlock, mediaMode: 'gallery' },
+              nextItems,
+              editingBlock.mediaGalleryTransition || 'fade'
+            )
+          );
+        } else {
+          const [{ image }] = preparedFiles;
+          if (editingBlock.type === BlockType.MEDIA && editingBlock.mediaGalleryItems?.length) {
+            const currentItems = normalizeMediaGalleryState(editingBlock);
+            const nextItems = currentItems.map((item, index) =>
+              index === 0 ? { ...item, url: image, enabled: true } : item
+            );
+            updateBlock(
+              syncMediaGalleryBlock(
+                editingBlock,
+                nextItems,
+                editingBlock.mediaGalleryTransition || 'fade'
+              )
+            );
+          } else {
+            updateBlock({ ...editingBlock, imageUrl: image });
+          }
+        }
+
+        e.target.value = '';
+        const noticeText = getNoticeText(preparedFiles.flatMap(({ notices }) => notices));
+        setImageNotice(noticeText || null);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Image invalide';
+        setImageError(message);
+      }
+    })();
   };
 
   const handleRemoveBlockImage = () => {
@@ -119,6 +169,8 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
   const isYouTubeActive =
     editingBlock?.type === BlockType.SOCIAL &&
     !!(editingBlock.channelId && editingBlock.channelId.length > 0);
+  const isMediaGalleryMode =
+    editingBlock?.type === BlockType.MEDIA && editingBlock.mediaMode === 'gallery';
   const editingBlockImageSrc = resolveImageSrc(editingBlock?.imageUrl);
   const editingBlockImageInput =
     typeof editingBlock?.imageUrl === 'string' ? editingBlock.imageUrl : '';
@@ -351,12 +403,13 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
         !(editingBlock.channelId && editingBlock.channelId.length > 0)));
 
   return (
-    <aside
-      role="complementary"
-      aria-label="Block editor sidebar"
-      className={`fixed right-0 top-0 h-screen w-full md:w-[400px] bg-white z-50 shadow-xl transform transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col border-l border-gray-200
+    <>
+      <aside
+        role="complementary"
+        aria-label="Block editor sidebar"
+        className={`fixed right-0 top-0 h-screen w-full md:w-[400px] bg-white z-50 shadow-xl transform transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] flex flex-col border-l border-gray-200
 	        ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
-    >
+      >
       {/* Header */}
       <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-20">
         <div>
@@ -904,6 +957,72 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                   />
                 </div>
               )}
+
+              {editingBlock.type === BlockType.MEDIA && (
+                <div className="space-y-4">
+                  <div className="p-1 bg-gray-100 rounded-xl flex">
+                    <button
+                      type="button"
+                      aria-pressed={!isMediaGalleryMode}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                        !isMediaGalleryMode
+                          ? 'bg-white shadow text-gray-900'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                      onClick={() =>
+                        updateBlock({
+                          ...editingBlock,
+                          mediaMode: 'single',
+                        })
+                      }
+                    >
+                      One Image
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={!!isMediaGalleryMode}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                        isMediaGalleryMode
+                          ? 'bg-white shadow text-gray-900'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                      onClick={() =>
+                        updateBlock({
+                          ...editingBlock,
+                          mediaMode: 'gallery',
+                        })
+                      }
+                    >
+                      Gallery Mode
+                    </button>
+                  </div>
+
+                  {isMediaGalleryMode && (
+                    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">Gallery manager</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Organise l’ordre, les transitions et les images actives.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsGalleryModalOpen(true)}
+                          className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-black transition-colors"
+                        >
+                          <Images size={14} />
+                          Manage
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-gray-400">
+                        {normalizeMediaGalleryState(editingBlock).length} media item(s)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {(editingBlock.type === BlockType.LINK ||
                 editingBlock.type === BlockType.MEDIA ||
                 editingBlock.type === BlockType.MAP ||
@@ -937,11 +1056,16 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                           ref={blockImageInputRef}
                           className="sr-only"
                           accept="image/*"
+                          multiple={editingBlock.type === BlockType.MEDIA}
                           onChange={handleBlockImageUpload}
                         />
                         <div className="flex flex-col items-center gap-2 text-gray-500">
                           <Upload size={20} />
-                          <span className="text-xs">Click to upload</span>
+                          <span className="text-xs">
+                            {editingBlock.type === BlockType.MEDIA
+                              ? 'Click to upload one or more images'
+                              : 'Click to upload'}
+                          </span>
                         </div>
                         {editingBlockImageSrc && (
                           <div className="mt-2 text-[10px] text-green-600 font-medium text-center">
@@ -958,7 +1082,7 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                           </div>
                         )}
                       </label>
-                      {editingBlockImageSrc && (
+                      {editingBlockImageSrc && !isMediaGalleryMode && (
                         <div className="mt-3 space-y-3">
                           <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
                             {editingBlock.type === BlockType.MEDIA &&
@@ -994,7 +1118,7 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                   )}
 
                   {(editingBlock.type === BlockType.LINK ||
-                    editingBlock.type === BlockType.MEDIA ||
+                    (editingBlock.type === BlockType.MEDIA && !isMediaGalleryMode) ||
                     editingBlock.type === BlockType.MAP) && (
                     <>
                       <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
@@ -1307,7 +1431,14 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
           </p>
         </div>
       )}
-    </aside>
+      </aside>
+      <MediaGalleryModal
+        isOpen={isGalleryModalOpen}
+        block={editingBlock}
+        onClose={() => setIsGalleryModalOpen(false)}
+        onSave={updateBlock}
+      />
+    </>
   );
 };
 

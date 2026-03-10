@@ -47,6 +47,12 @@ export interface SocialAccount {
   followerCount?: number; // Optional follower/subscriber count
 }
 
+export interface MediaGalleryItem {
+  id: string;
+  url: string | ImageData;
+  enabled: boolean;
+}
+
 export interface BlockData {
   id: string;
   type: BlockType;
@@ -56,6 +62,12 @@ export interface BlockData {
   opacity?: number; // 0-1
   imageUrl?: string | ImageData;
   imageBlur?: number; // Blur amount for image backgrounds (0-20)
+  mediaMode?: 'single' | 'gallery';
+  mediaGallery?: Array<string | ImageData>;
+  mediaGalleryItems?: MediaGalleryItem[];
+  mediaGalleryTransition?: 'fade' | 'slide' | 'zoom' | 'blur';
+  mediaGalleryIntervalMs?: number;
+  mediaGalleryDurationMs?: number;
   mediaPosition?: { x: number; y: number }; // Object position for media (0-100 for each axis)
   colSpan: number; // 1-9 (9-col grid)
   rowSpan: number; // 1+ (builder clamps to 50)

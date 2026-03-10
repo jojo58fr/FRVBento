@@ -4,6 +4,7 @@
 
 export const generateImports =
   (): string => `import { useState, useEffect, useRef, useCallback } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Youtube, Play, Loader2 } from 'lucide-react'
 import {
   SiX, SiInstagram, SiTiktok, SiYoutube, SiGithub, SiGitlab, SiLinkedin,

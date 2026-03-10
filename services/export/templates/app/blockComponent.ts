@@ -8,7 +8,13 @@ const Block = ({ block }: { block: BlockData }) => {
   const { elementRef, tiltStyle, handleMouseMove, handleMouseLeave } = useTiltEffect(true)
   const [videos, setVideos] = useState(block.youtubeVideos || [])
   const [loading, setLoading] = useState(false)
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0)
   const mediaPos = block.mediaPosition || { x: 50, y: 50 }
+  const mediaItems = (block.mediaGalleryItems?.length
+    ? block.mediaGalleryItems.filter(item => item.enabled).map(item => item.url)
+    : [block.imageUrl, ...(block.mediaGallery || [])].filter(Boolean)) as string[]
+  const hasGallery = block.type === BlockType.MEDIA && block.mediaMode === 'gallery' && mediaItems.length > 1
+  const activeMediaUrl = mediaItems[activeMediaIndex] || block.imageUrl
 
   useEffect(() => {
     if (block.type === BlockType.SOCIAL && block.channelId && !block.youtubeVideos?.length) {
@@ -28,6 +34,18 @@ const Block = ({ block }: { block: BlockData }) => {
       }).catch(() => {}).finally(() => setLoading(false))
     }
   }, [block.channelId, block.youtubeVideos, block.type])
+
+  useEffect(() => {
+    setActiveMediaIndex(0)
+  }, [block.id, block.imageUrl, block.mediaGallery, block.mediaGalleryItems])
+
+  useEffect(() => {
+    if (!hasGallery) return
+    const intervalId = window.setInterval(() => {
+      setActiveMediaIndex(current => (current + 1) % mediaItems.length)
+    }, block.mediaGalleryIntervalMs || 4000)
+    return () => window.clearInterval(intervalId)
+  }, [block.mediaGalleryIntervalMs, hasGallery, mediaItems.length])
 
   const getBorderRadius = () => {
     const minDim = Math.min(block.colSpan, block.rowSpan)
@@ -136,6 +154,88 @@ const Block = ({ block }: { block: BlockData }) => {
     } : {}),
   }
 
+  const renderMediaContent = () => {
+    if (!activeMediaUrl) return null
+
+    if (/\\.(mp4|webm|ogg|mov)$/i.test(activeMediaUrl)) {
+      return (
+        <video
+          src={activeMediaUrl}
+          className="full-img"
+          style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\`, opacity: blockOpacity }}
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
+      )
+    }
+
+    if (!hasGallery) {
+      return (
+        <img
+          src={activeMediaUrl}
+          alt={block.title || ''}
+          className="full-img"
+          style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\`, opacity: blockOpacity }}
+          draggable={false}
+        />
+      )
+    }
+
+    const duration = Math.max(0.1, (block.mediaGalleryDurationMs || 600) / 1000)
+    const transition = block.mediaGalleryTransition || 'fade'
+    const animation =
+      transition === 'slide'
+        ? {
+            initial: { opacity: 0, x: 40 },
+            animate: { opacity: 1, x: 0 },
+            exit: { opacity: 0, x: -40 },
+            transition: { duration, ease: [0.22, 1, 0.36, 1] },
+          }
+        : transition === 'zoom'
+          ? {
+              initial: { opacity: 0, scale: 1.08 },
+              animate: { opacity: 1, scale: 1 },
+              exit: { opacity: 0, scale: 0.96 },
+              transition: { duration, ease: [0.22, 1, 0.36, 1] },
+            }
+          : transition === 'blur'
+            ? {
+                initial: { opacity: 0, filter: 'blur(18px)', scale: 1.03 },
+                animate: { opacity: 1, filter: 'blur(0px)', scale: 1 },
+                exit: { opacity: 0, filter: 'blur(18px)', scale: 1.01 },
+                transition: { duration, ease: 'easeInOut' },
+              }
+            : {
+                initial: { opacity: 0 },
+                animate: { opacity: 1 },
+                exit: { opacity: 0 },
+                transition: { duration, ease: 'easeInOut' },
+              }
+
+    return (
+      <AnimatePresence mode="sync">
+        <motion.div
+          key={activeMediaUrl}
+          className="absolute inset-0"
+          initial={animation.initial}
+          animate={animation.animate}
+          exit={animation.exit}
+          transition={animation.transition}
+        >
+          <img
+            src={activeMediaUrl}
+            alt={block.title || ''}
+            className="full-img"
+            style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\`, opacity: blockOpacity }}
+            draggable={false}
+          />
+        </motion.div>
+      </AnimatePresence>
+    )
+  }
+
   return (
     <div onClick={handleClick} style={{ ...gridStyle }} className="cursor-pointer h-full transform-gpu">
       <div ref={elementRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
@@ -152,13 +252,9 @@ const Block = ({ block }: { block: BlockData }) => {
             style={{ opacity: blockOpacity }} />
         )}
         <div className="w-full h-full relative z-10">
-          {block.type === BlockType.MEDIA && block.imageUrl && !hasImageBackground ? (
+          {block.type === BlockType.MEDIA && activeMediaUrl && !hasImageBackground ? (
             <div className="w-full h-full relative overflow-hidden">
-              {/\\.(mp4|webm|ogg|mov)$/i.test(block.imageUrl) ? (
-                <video src={block.imageUrl} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\`, opacity: blockOpacity }} autoPlay loop muted playsInline />
-              ) : (
-                <img src={block.imageUrl} alt={block.title || ''} className="full-img" style={{ objectPosition: \`\${mediaPos.x}% \${mediaPos.y}%\`, opacity: blockOpacity }} />
-              )}
+              {renderMediaContent()}
               {block.title && <div className="media-overlay"><p className="media-title text-sm">{block.title}</p>{block.subtext && <p className="media-subtext">{block.subtext}</p>}</div>}
             </div>
           ) : block.type === BlockType.MAP ? (

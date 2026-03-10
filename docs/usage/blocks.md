@@ -69,6 +69,9 @@ Display images and GIFs.
 
 **Features:**
 - Image upload
+- One image mode or gallery mode
+- Multiple gallery transitions
+- Transition timing controls
 - Position control (focal point)
 - Responsive sizing
 - GIF support
@@ -78,6 +81,13 @@ Display images and GIFs.
 - PNG
 - GIF
 - WebP
+
+**Gallery mode:**
+1. Switch the media block to `Gallery Mode`
+2. Open the gallery manager
+3. Upload multiple images
+4. Reorder slides and toggle visibility
+5. Choose a transition, delay, and animation duration
 
 ## YouTube Block
 

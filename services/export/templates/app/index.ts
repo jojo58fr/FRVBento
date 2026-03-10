@@ -52,6 +52,13 @@ export const generateAppTsx = (data: SiteData, imageMap: ImageMap, siteId?: stri
       return {
         ...b,
         imageUrl: imageUrl && imageMap[`block_${b.id}`] ? imageMap[`block_${b.id}`] : imageUrl,
+        mediaGallery: b.mediaGallery?.map(
+          (item, index) => imageMap[`block_${b.id}_gallery_${index}`] || item
+        ),
+        mediaGalleryItems: b.mediaGalleryItems?.map((item, index) => ({
+          ...item,
+          url: imageMap[`block_${b.id}_gallery_item_${index}`] || item.url,
+        })),
       };
     })
   );

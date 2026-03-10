@@ -50,6 +50,32 @@ export function extractImages(data: SiteData, assetsFolder: JSZip | null): Image
         imageMap[`block_${block.id}`] = `/assets/${filename}`;
       }
     }
+
+    block.mediaGallery?.forEach((item, index) => {
+      const itemSrc = resolveImageSrc(item);
+      if (!itemSrc?.startsWith('data:image')) return;
+
+      const blob = base64ToBlob(itemSrc);
+      if (blob && assetsFolder) {
+        const ext = getExtension(itemSrc);
+        const filename = `block-${block.id}-gallery-${index + 1}.${ext}`;
+        assetsFolder.file(filename, blob);
+        imageMap[`block_${block.id}_gallery_${index}`] = `/assets/${filename}`;
+      }
+    });
+
+    block.mediaGalleryItems?.forEach((item, index) => {
+      const itemSrc = resolveImageSrc(item.url);
+      if (!itemSrc?.startsWith('data:image')) return;
+
+      const blob = base64ToBlob(itemSrc);
+      if (blob && assetsFolder) {
+        const ext = getExtension(itemSrc);
+        const filename = `block-${block.id}-gallery-item-${index + 1}.${ext}`;
+        assetsFolder.file(filename, blob);
+        imageMap[`block_${block.id}_gallery_item_${index}`] = `/assets/${filename}`;
+      }
+    });
   }
 
   return imageMap;

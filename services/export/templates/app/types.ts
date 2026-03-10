@@ -27,6 +27,12 @@ interface BlockData {
   opacity?: number
   imageUrl?: string
   imageBlur?: number
+  mediaMode?: 'single' | 'gallery'
+  mediaGallery?: string[]
+  mediaGalleryItems?: MediaGalleryItem[]
+  mediaGalleryTransition?: 'fade' | 'slide' | 'zoom' | 'blur'
+  mediaGalleryIntervalMs?: number
+  mediaGalleryDurationMs?: number
   mediaPosition?: { x: number; y: number }
   colSpan: number
   rowSpan: number
@@ -46,5 +52,11 @@ interface BlockData {
   collectionId?: string
   expandedByDefault?: boolean
   zIndex?: number
+}
+
+interface MediaGalleryItem {
+  id: string
+  url: string
+  enabled: boolean
 }
 `;
