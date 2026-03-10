@@ -93,7 +93,12 @@ const SortableCard: React.FC<SortableCardProps> = ({ item, index, onRemove, onTo
   );
 };
 
-const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({ isOpen, block, onClose, onSave }) => {
+const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
+  isOpen,
+  block,
+  onClose,
+  onSave,
+}) => {
   const [items, setItems] = useState<MediaGalleryItem[]>([]);
   const [transition, setTransition] = useState<BlockData['mediaGalleryTransition']>('fade');
   const [intervalMs, setIntervalMs] = useState(MEDIA_GALLERY_INTERVAL_MS);
