@@ -4,6 +4,7 @@ export enum BlockType {
   FLUID_TEXT = 'FLUID_TEXT',
   MEDIA = 'MEDIA', // Images, GIFs, videos
   SOCIAL = 'SOCIAL',
+  TWITCH = 'TWITCH',
   COLLECTION = 'COLLECTION',
   SOCIAL_ICON = 'SOCIAL_ICON', // Small icon-only social block for 9x9 grid
   MAP = 'MAP',
@@ -92,6 +93,8 @@ export interface BlockData {
   // Social platform (non-YouTube mode)
   socialPlatform?: SocialPlatform;
   socialHandle?: string; // Stored without leading '@' when possible
+  twitchChannel?: string;
+  twitchVideoId?: string;
   collectionId?: string;
   expandedByDefault?: boolean;
 

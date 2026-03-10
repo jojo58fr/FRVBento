@@ -13,6 +13,7 @@ import {
   Type as TypeIcon,
   MoveVertical,
   Youtube,
+  Twitch,
   ExternalLink,
   RefreshCw,
   Loader2,
@@ -958,6 +959,52 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 </div>
               )}
 
+              {editingBlock.type === BlockType.TWITCH && (
+                <div className="p-5 bg-[#f5f1ff] rounded-2xl border border-[#e6dbff] space-y-5">
+                  <div>
+                    <label
+                      htmlFor="twitch-channel-input"
+                      className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2"
+                    >
+                      Chaine Twitch
+                    </label>
+                    <input
+                      id="twitch-channel-input"
+                      type="text"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#a970ff]/20 focus:outline-none text-sm placeholder-gray-400 font-medium"
+                      value={editingBlock.twitchChannel || ''}
+                      onChange={(e) =>
+                        updateBlock({ ...editingBlock, twitchChannel: e.target.value })
+                      }
+                      placeholder="frvtubers ou https://www.twitch.tv/frvtubers"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="twitch-fallback-video-input"
+                      className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2"
+                    >
+                      VOD de fallback
+                    </label>
+                    <input
+                      id="twitch-fallback-video-input"
+                      type="text"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#a970ff]/20 focus:outline-none text-sm placeholder-gray-400 font-mono"
+                      value={editingBlock.twitchVideoId || ''}
+                      onChange={(e) =>
+                        updateBlock({ ...editingBlock, twitchVideoId: e.target.value })
+                      }
+                      placeholder="ID video Twitch ou URL /videos/123456"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-2">
+                      Si la chaine est hors live, le bloc affiche ce replay. Si ce champ est vide,
+                      le dernier replay trouve via Twitch est utilise.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {editingBlock.type === BlockType.MEDIA && (
                 <div className="space-y-4">
                   <div className="p-1 bg-gray-100 rounded-xl flex">
@@ -1159,7 +1206,8 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
               {(editingBlock.type === BlockType.TEXT ||
                 editingBlock.type === BlockType.LINK ||
-                editingBlock.type === BlockType.SOCIAL) && (
+                editingBlock.type === BlockType.SOCIAL ||
+                editingBlock.type === BlockType.TWITCH) && (
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
                     {editingBlock.type === BlockType.TEXT ? 'Description' : 'Subtitle / Details'}
@@ -1377,6 +1425,7 @@ const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 {[
                   { type: BlockType.LINK, label: 'Link', icon: Link, color: 'bg-blue-600' },
                   { type: BlockType.SOCIAL, label: 'Social', icon: Github, color: 'bg-violet-600' },
+                  { type: BlockType.TWITCH, label: 'Twitch', icon: Twitch, color: 'bg-[#9146FF]' },
                   { type: BlockType.MEDIA, label: 'Media', icon: ImageIcon, color: 'bg-pink-600' },
                   { type: BlockType.TEXT, label: 'Note', icon: TypeIcon, color: 'bg-emerald-600' },
                   {

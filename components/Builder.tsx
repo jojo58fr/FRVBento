@@ -1306,6 +1306,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       if (type === BlockType.SOCIAL_ICON) return { colSpan: 1, rowSpan: 1 };
       if (type === BlockType.COLLECTION) return { colSpan: 9, rowSpan: 2 };
       if (type === BlockType.SPACER) return { colSpan: 9, rowSpan: 1 };
+      if (type === BlockType.TWITCH) return { colSpan: 6, rowSpan: 4 };
       if (type === BlockType.FLUID_TEXT) return { colSpan: 6, rowSpan: 3 };
       return { colSpan: 3, rowSpan: 3 }; // Regular blocks take 3x3 cells
     };
@@ -1321,6 +1322,8 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
             ? 'New Collection'
             : type === BlockType.SOCIAL_ICON
               ? ''
+              : type === BlockType.TWITCH
+                ? 'Twitch'
               : type === BlockType.MAP
                 ? 'Location'
                 : type === BlockType.SPACER
@@ -1344,6 +1347,9 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
       gridColumn: gridPosition.col,
       gridRow: gridPosition.row,
       ...(type === BlockType.SOCIAL ? { socialPlatform: 'x' as const, socialHandle: '' } : {}),
+      ...(type === BlockType.TWITCH
+        ? { twitchChannel: '', twitchVideoId: '', subtext: 'Lecture auto du replay hors live' }
+        : {}),
       ...(type === BlockType.COLLECTION ? { expandedByDefault: true } : {}),
       ...(type === BlockType.SOCIAL_ICON
         ? { socialPlatform: 'instagram' as const, socialHandle: '' }
@@ -3132,6 +3138,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                                     onInlineUpdate={updateBlock}
                                                     enableTiltEffect={false}
                                                     previewMode={true}
+                                                    allowEmbedPlayback={false}
                                                     draggableEnabled={false}
                                                   />
                                                 </div>
@@ -3183,6 +3190,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                                     onInlineUpdate={updateBlock}
                                     enableTiltEffect={false}
                                     previewMode={true}
+                                    allowEmbedPlayback={false}
                                     draggableEnabled={false}
                                   />
                                 </div>

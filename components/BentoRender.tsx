@@ -8,6 +8,8 @@ import { ChevronDown, Moon, Palette, Sun } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import ProfileSocialIcons from './ProfileSocialIcons';
 
+const GRID_COLS = 9;
+
 interface BentoRenderProps {
   bento: SavedBento;
 }
@@ -59,9 +61,69 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
   };
 
   const isCollectionBlock = (block: BlockData) => block.type === BlockType.COLLECTION;
+  const normalizedDesktopBlocks = (() => {
+    const occupiedCells = new Set<string>();
+    const withKnownPositions = blocks.map((block) => {
+      if (block.gridColumn === undefined || block.gridRow === undefined) {
+        return block;
+      }
 
-  // Sort blocks for mobile (by row, then column)
-  const sortedBlocks = [...blocks].sort((a, b) => {
+      const maxCols = Math.min(block.colSpan, GRID_COLS - block.gridColumn + 1);
+      for (let c = block.gridColumn; c < block.gridColumn + maxCols; c++) {
+        for (let r = block.gridRow; r < block.gridRow + block.rowSpan; r++) {
+          occupiedCells.add(`${c}-${r}`);
+        }
+      }
+      return block;
+    });
+
+    let autoRow = 1;
+    let autoCol = 1;
+
+    return withKnownPositions.map((block) => {
+      if (block.gridColumn !== undefined && block.gridRow !== undefined) {
+        return block;
+      }
+
+      const neededCols = Math.min(block.colSpan, GRID_COLS);
+      while (true) {
+        let canPlace = true;
+
+        for (let c = autoCol; c < autoCol + neededCols && canPlace; c++) {
+          for (let r = autoRow; r < autoRow + block.rowSpan && canPlace; r++) {
+            if (c > GRID_COLS || occupiedCells.has(`${c}-${r}`)) {
+              canPlace = false;
+            }
+          }
+        }
+
+        if (canPlace) {
+          for (let c = autoCol; c < autoCol + neededCols; c++) {
+            for (let r = autoRow; r < autoRow + block.rowSpan; r++) {
+              occupiedCells.add(`${c}-${r}`);
+            }
+          }
+
+          const placed = { ...block, gridColumn: autoCol, gridRow: autoRow };
+          autoCol += neededCols;
+          if (autoCol > GRID_COLS) {
+            autoCol = 1;
+            autoRow++;
+          }
+          return placed;
+        }
+
+        autoCol++;
+        if (autoCol > GRID_COLS) {
+          autoCol = 1;
+          autoRow++;
+        }
+      }
+    });
+  })();
+
+  // Sort blocks for grid-based layouts (mobile + desktop bento)
+  const sortedBlocks = [...normalizedDesktopBlocks].sort((a, b) => {
     const aRow = a.gridRow ?? 999;
     const bRow = b.gridRow ?? 999;
     const aCol = a.gridColumn ?? 999;
@@ -69,7 +131,7 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
     if (aRow !== bRow) return aRow - bRow;
     return aCol - bCol;
   });
-  const verticalTopLevelBlocks = sortedBlocks.filter((block) => !block.collectionId);
+  const verticalTopLevelBlocks = blocks.filter((block) => !block.collectionId);
 
   useEffect(() => {
     setExpandedCollections((prev) => {
@@ -234,7 +296,7 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
             <div className="mt-6 space-y-4">
               {verticalTopLevelBlocks.map((block) => {
                 if (isCollectionBlock(block)) {
-                  const children = sortedBlocks.filter((child) => child.collectionId === block.id);
+                  const children = blocks.filter((child) => child.collectionId === block.id);
                   const themedBlock = applyThemeToBlock(block);
                   const isExpanded =
                     expandedCollections[block.id] ?? block.expandedByDefault !== false;
@@ -419,7 +481,7 @@ const BentoRender: React.FC<BentoRenderProps> = ({ bento }) => {
                   className="grid gap-2"
                   style={{ gridTemplateColumns: 'repeat(9, 1fr)', gridAutoRows: '64px' }}
                 >
-                  {blocks.map((block, index) => (
+                  {normalizedDesktopBlocks.map((block, index) => (
                     <Block
                       key={block.id}
                       block={{ ...applyThemeToBlock(block), zIndex: index + 1 }}

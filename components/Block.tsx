@@ -24,6 +24,7 @@ import {
   isVideoMediaUrl,
 } from '../utils/mediaGallery';
 import FluidTextEffect from './FluidTextEffect';
+import TwitchPlayerEmbed from './TwitchPlayerEmbed';
 
 // Apple TV style 3D tilt effect hook
 const useTiltEffect = (isEnabled: boolean = true) => {
@@ -101,6 +102,7 @@ interface BlockProps {
   enableTiltEffect?: boolean; // Apple TV style 3D tilt on hover
   previewMode?: boolean; // In preview mode, clicks navigate to URLs instead of editing
   draggableEnabled?: boolean;
+  allowEmbedPlayback?: boolean;
 }
 
 const Block: React.FC<BlockProps> = ({
@@ -122,6 +124,7 @@ const Block: React.FC<BlockProps> = ({
   enableTiltEffect,
   previewMode,
   draggableEnabled = true,
+  allowEmbedPlayback = previewMode,
 }) => {
   // Apple TV tilt effect
   const {
@@ -666,6 +669,8 @@ const Block: React.FC<BlockProps> = ({
   const activeVideos = fetchedVideos.length > 0 ? fetchedVideos : [];
   const activeVideoId =
     block.youtubeVideoId || (activeVideos.length > 0 ? activeVideos[0].id : undefined);
+  const isTwitch = block.type === BlockType.TWITCH;
+  const showStaticTwitchPreview = isTwitch && previewMode && !allowEmbedPlayback;
   const isYoutube =
     block.type === BlockType.SOCIAL &&
     (!!block.channelId || block.title?.toLowerCase().includes('youtube'));
@@ -959,6 +964,7 @@ const Block: React.FC<BlockProps> = ({
       }}
       onClick={() => {
         if (previewMode) {
+          if (block.type === BlockType.TWITCH) return;
           // In preview mode, navigate to block URL with security validation
           let url = block.content;
           if (block.type === BlockType.SOCIAL && block.socialPlatform && block.socialHandle) {
@@ -976,7 +982,7 @@ const Block: React.FC<BlockProps> = ({
       animate={{ opacity: 1, scale: 1 }}
       whileHover={enableTiltEffect ? undefined : { y: -4, transition: { duration: 0.2 } }}
       style={{ ...gridPositionStyle }}
-      className={`${colClass} ${rowClass} cursor-pointer select-none h-full
+      className={`${colClass} ${rowClass} ${isTwitch && previewMode ? 'cursor-default' : 'cursor-pointer'} select-none h-full
         ${isDragTarget ? 'z-20 scale-[1.02]' : ''}
         ${isDragging ? 'opacity-40 scale-95' : ''}
         ${enableTiltEffect ? 'transform-gpu' : ''}
@@ -988,7 +994,7 @@ const Block: React.FC<BlockProps> = ({
         onMouseLeave={enableTiltEffect ? onTiltLeave : undefined}
         onMouseEnter={enableTiltEffect ? onTiltEnter : undefined}
         style={{ borderRadius, ...tiltWrapperStyle }}
-        className={`bento-item group relative overflow-hidden w-full h-full ${!block.customBackground && !hasImageBackground && !isRichYoutube ? block.color || 'bg-white' : ''} ${block.textColor || 'text-gray-900'}
+        className={`bento-item group relative overflow-hidden w-full h-full ${!block.customBackground && !hasImageBackground && !isRichYoutube && !isTwitch ? block.color || 'bg-white' : ''} ${block.textColor || 'text-gray-900'}
           ${isSelected ? 'ring-4 ring-blue-500 shadow-xl' : 'ring-1 ring-black/5'}
           ${!isSelected && !enableTiltEffect ? 'shadow-sm hover:shadow-xl' : 'shadow-sm'}
           ${isDragTarget ? 'ring-2 ring-violet-500' : ''}
@@ -996,9 +1002,9 @@ const Block: React.FC<BlockProps> = ({
           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
         `}
       >
-        {(isRichYoutube || hasImageBackground || block.customBackground || block.color) && (
+        {(isRichYoutube || hasImageBackground || block.customBackground || (block.color && !isTwitch)) && (
           <div
-            className={`absolute inset-0 ${!block.customBackground && !hasImageBackground && !isRichYoutube ? block.color || 'bg-white' : ''}`}
+            className={`absolute inset-0 ${!block.customBackground && !hasImageBackground && !isRichYoutube && !isTwitch ? block.color || 'bg-white' : ''}`}
             style={backgroundLayerStyle}
           />
         )}
@@ -1126,9 +1132,39 @@ const Block: React.FC<BlockProps> = ({
           </>
         )}
 
-        <div className="w-full h-full pointer-events-none relative z-10">
+        <div
+          className={`w-full h-full relative z-10 ${
+            isTwitch && previewMode && !showStaticTwitchPreview
+              ? 'pointer-events-auto'
+              : 'pointer-events-none'
+          }`}
+        >
           {/* MEDIA BLOCK (Image/Video/GIF) */}
-          {block.type === BlockType.MEDIA && activeMediaUrl && !hasImageBackground ? (
+          {block.type === BlockType.TWITCH ? (
+            <div className="w-full h-full">
+              {showStaticTwitchPreview ? (
+                <div className="w-full h-full bg-[radial-gradient(circle_at_top,_rgba(169,112,255,0.28),_transparent_55%),linear-gradient(180deg,_#18181b_0%,_#0f0f12_100%)] flex items-end p-4">
+                  <div className="rounded-xl bg-black/35 border border-white/10 px-3 py-2 backdrop-blur-sm">
+                    <p className="text-xs font-semibold text-white">
+                      {block.title || 'Twitch'}
+                    </p>
+                    <p className="text-[11px] text-white/70 mt-1 truncate">
+                      {block.twitchChannel || 'Apercu statique dans l editeur'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <TwitchPlayerEmbed
+                  channel={block.twitchChannel}
+                  fallbackVideoId={block.twitchVideoId}
+                  title={block.title}
+                  subtext={block.subtext}
+                  interactive={!!previewMode}
+                  renderIframe={allowEmbedPlayback}
+                />
+              )}
+            </div>
+          ) : block.type === BlockType.MEDIA && activeMediaUrl && !hasImageBackground ? (
             <div
               ref={mediaContainerRef}
               className={`w-full h-full relative overflow-hidden ${isRepositioning ? 'cursor-move' : ''}`}
