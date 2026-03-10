@@ -649,6 +649,7 @@ const Builder: React.FC<BuilderProps> = ({ onBack }) => {
                 ? 'Spacer'
                 : 'New Block',
       content: '',
+      opacity: 1,
       colSpan,
       rowSpan,
       color:
